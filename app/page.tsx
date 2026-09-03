@@ -9,7 +9,7 @@ import {
 } from "@/lib/data";
 import { suppliers, gradeToRisk } from "@/lib/suppliers";
 
-export const revalidate = 300; // 5분마다 재검증 (실 API 연동 시 조정)
+export const revalidate = 1800; // 30분 캐시 + 매일 09:00(KST) /api/cron/refresh 로 강제 갱신
 
 export default async function DashboardPage() {
   const [summary, news, logistics, materials] = await Promise.all([
@@ -130,11 +130,12 @@ export default async function DashboardPage() {
               <tr key={m.id}>
                 <td>{m.materialName}</td>
                 <td>
-                  {m.currentPrice.toLocaleString()} {m.unit}
+                  {m.live
+                    ? `${m.currentPrice.toLocaleString(undefined, { maximumFractionDigits: 2 })} ${m.unit}`
+                    : "-"}
                 </td>
                 <td className={m.changeRate >= 0 ? "change-up" : "change-down"}>
-                  {m.changeRate >= 0 ? "+" : ""}
-                  {m.changeRate}%
+                  {m.live ? `${m.changeRate >= 0 ? "+" : ""}${m.changeRate}%` : "-"}
                 </td>
                 <td>
                   <RiskBadge risk={m.risk} />

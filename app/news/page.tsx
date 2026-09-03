@@ -1,7 +1,8 @@
 import RiskBadge from "@/components/RiskBadge";
 import { fetchSupplierNews } from "@/lib/data";
 
-export const revalidate = 300;
+// Google 뉴스 RSS 실시간 크롤링 결과를 사용합니다. 30분 캐시 + 매일 09:00(KST) 강제 갱신.
+export const revalidate = 1800;
 
 export default async function NewsPage() {
   const news = await fetchSupplierNews();
@@ -10,7 +11,7 @@ export default async function NewsPage() {
     <>
       <h1>공급업체 뉴스 모니터링</h1>
       <p className="page-subtitle">
-        재무·법적분쟁·ESG·경영권 이슈 등 공급업체 관련 언론·공시 실시간 추적
+        Google 뉴스 실시간 크롤링(내부 평가 위험·유의 등급 업체 우선) + 내부 평가 보완 데이터
       </p>
 
       <div className="panel">
@@ -19,8 +20,7 @@ export default async function NewsPage() {
           <thead>
             <tr>
               <th>공급업체</th>
-              <th>헤드라인</th>
-              <th>분류</th>
+              <th>내용</th>
               <th>출처</th>
               <th>게재 시각</th>
               <th>리스크</th>
@@ -30,8 +30,15 @@ export default async function NewsPage() {
             {news.map((n) => (
               <tr key={n.id}>
                 <td>{n.supplierName}</td>
-                <td>{n.headline}</td>
-                <td>{n.category}</td>
+                <td>
+                  {n.link ? (
+                    <a href={n.link} target="_blank" rel="noopener noreferrer" className="panel-link">
+                      {n.headline}
+                    </a>
+                  ) : (
+                    n.headline
+                  )}
+                </td>
                 <td>{n.sourceName}</td>
                 <td>{n.publishedAt}</td>
                 <td>

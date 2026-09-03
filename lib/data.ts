@@ -1,4 +1,7 @@
 import { suppliers, gradeToRisk } from "./suppliers";
+import { fetchLiveSupplierNews } from "./live/news";
+import { fetchLiveExchangeRates, FxRate } from "./live/fx";
+import { fetchLiveMetalPrices } from "./live/metals";
 
 export type RiskLevel = "상" | "중" | "하";
 
@@ -10,14 +13,15 @@ export interface MaterialPrice {
   changeRate: number; // percent, +/-
   risk: RiskLevel;
   source: string;
-  updatedAt: string;
+  live: boolean;
+  note?: string;
 }
 
 export interface SupplierNewsItem {
   id: string;
   supplierName: string;
   headline: string;
-  category: "재무" | "법적분쟁" | "ESG" | "경영권" | "기타";
+  link?: string;
   risk: RiskLevel;
   sourceName: string;
   publishedAt: string;
@@ -51,74 +55,77 @@ export interface DashboardSummary {
 }
 
 /**
- * 아래 함수들은 목업 데이터를 반환합니다.
- * 실제 연동 시 이 파일의 함수 내부만 교체하면 됩니다:
- *  - fetchMaterialPrices  -> LME, 한국자원정보서비스(KOMIS), 원자재 거래소 API
- *  - fetchSupplierNews    -> 뉴스 API(빅카인즈, 네이버 뉴스), 기업 신용정보(NICE, KED) API
- *  - fetchLogisticsStatus -> 선사/포워더 API, 관세청 수출입 통관 정보
- *  - fetchBiddingStatus   -> 나라장터(조달청) API, 사내 ERP/SRM 연동
- * 각 함수는 fetch()로 외부 API를 호출하는 서버 컴포넌트/라우트 핸들러에서
- * 사용하도록 async로 선언해 두었습니다.
+ * 실시간 데이터 소스 (모두 lib/live/*.ts):
+ *  - fetchMaterialPrices  -> Yahoo Finance(비공식, 구리/알루미늄/금/원유) + 환율(Frankfurter.app)
+ *  - fetchSupplierNews    -> Google 뉴스 RSS 실시간 크롤링 (내부 평가 위험/유의 등급 업체 우선)
+ *  - fetchLogisticsStatus / fetchBiddingStatus -> 아직 목업. 아래 함수 내부만 교체하면 됩니다:
+ *      물류: 선사/포워더 API, 관세청 수출입 통관 정보
+ *      입찰: 나라장터(조달청) API, 사내 ERP/SRM 연동
+ *
+ * 캐시: 각 실시간 fetch는 30분(1800초) 캐시 + 태그(supplier-news / fx-rates / metal-prices)를
+ * 가지고 있어, /api/cron/refresh 가 매일 09시(KST)에 태그를 무효화하여 즉시 새로 고칩니다.
  */
 
+function materialRisk(m: { live: boolean; changeRate: number }): RiskLevel {
+  if (!m.live) return "중";
+  const abs = Math.abs(m.changeRate);
+  if (abs >= 5) return "상";
+  if (abs >= 2) return "중";
+  return "하";
+}
+
 export async function fetchMaterialPrices(): Promise<MaterialPrice[]> {
-  return [
-    { id: "m1", materialName: "구리 (Copper)", unit: "USD/톤", currentPrice: 9820, changeRate: 3.4, risk: "중", source: "LME", updatedAt: "2026-09-03 09:00" },
-    { id: "m2", materialName: "알루미늄", unit: "USD/톤", currentPrice: 2510, changeRate: -1.2, risk: "하", source: "LME", updatedAt: "2026-09-03 09:00" },
-    { id: "m3", materialName: "니켈", unit: "USD/톤", currentPrice: 16200, changeRate: 7.8, risk: "상", source: "LME", updatedAt: "2026-09-03 09:00" },
-    { id: "m4", materialName: "폴리프로필렌(PP)", unit: "KRW/kg", currentPrice: 1450, changeRate: 0.5, risk: "하", source: "KOMIS", updatedAt: "2026-09-03 08:30" },
-  ];
+  const live = await fetchLiveMetalPrices();
+  return live.map((m) => ({
+    id: m.id,
+    materialName: m.materialName,
+    unit: m.unit,
+    currentPrice: m.currentPrice,
+    changeRate: m.changeRate,
+    risk: materialRisk(m),
+    source: m.source,
+    live: m.live,
+    note: m.note,
+  }));
+}
+
+export async function fetchExchangeRates(): Promise<{ rates: FxRate[]; asOf: string; live: boolean }> {
+  return fetchLiveExchangeRates();
 }
 
 /**
- * 공급업체 뉴스 목록.
- * 업체명·평가등급·비고(참고사항)는 "주요_공급업체_99개_AI평가기준_스코어링" 원본의 실제 평가
- * 데이터(lib/suppliers.ts)를 그대로 사용합니다. headline/sourceName/publishedAt은 아직 외부
- * 뉴스 API가 연동되지 않아 평가 결과를 바탕으로 생성한 예시 문구입니다.
- * 실제 연동 시: 이 함수 내부를 뉴스 API(빅카인즈 등) 호출 결과로 교체하고,
- * suppliers 배열의 업체명을 검색 키워드로 사용하면 됩니다.
+ * 공급업체 뉴스.
+ * Google 뉴스 RSS로 실시간 크롤링한 결과(fromLive)를 우선 사용하고,
+ * 크롤링이 비어 있는 업체는 내부 평가 데이터(비고/등급) 기반 항목으로 보완합니다.
  */
 export async function fetchSupplierNews(): Promise<SupplierNewsItem[]> {
-  const riskFlagged = suppliers.filter((s) => gradeToRisk(s.grade) !== "하" && s.note);
-  const fromNotes: SupplierNewsItem[] = riskFlagged.map((s, idx) => ({
-    id: `n-note-${s.id}`,
-    supplierName: s.name,
-    headline: `[내부 평가] ${s.note} — 최종등급 ${s.grade}`,
-    category: "재무",
-    risk: gradeToRisk(s.grade),
-    sourceName: "구매팀 AI 평가 결과",
-    publishedAt: `2026-09-0${(idx % 3) + 1} 09:00`,
+  const liveItems = await fetchLiveSupplierNews();
+  const fromLive: SupplierNewsItem[] = liveItems.map((n) => ({
+    id: n.id,
+    supplierName: n.supplierName,
+    headline: n.title,
+    link: n.link,
+    risk: n.risk,
+    sourceName: n.source,
+    publishedAt: n.publishedAt,
   }));
 
-  const riskGradeOnly = suppliers.filter(
-    (s) =>
-      (s.grade === "위험 (Risk)" || s.grade === "위험 (Risk) - 과락" || s.grade === "유의 (Caution)") &&
-      !s.note
+  const coveredNames = new Set(liveItems.map((n) => n.supplierName));
+  const riskFlagged = suppliers.filter(
+    (s) => gradeToRisk(s.grade) !== "하" && !coveredNames.has(s.name)
   );
-  const fromGrade: SupplierNewsItem[] = riskGradeOnly.slice(0, 6).map((s, idx) => ({
-    id: `n-grade-${s.id}`,
+  const fromInternal: SupplierNewsItem[] = riskFlagged.slice(0, 10).map((s) => ({
+    id: `internal-${s.id}`,
     supplierName: s.name,
-    headline: `종합점수 ${s.totalScore}점, 최종등급 ${s.grade}로 재무 리스크 주의 필요`,
-    category: "재무",
+    headline: s.note
+      ? `[내부 평가] ${s.note} — 최종등급 ${s.grade}`
+      : `종합점수 ${s.totalScore}점, 최종등급 ${s.grade}로 재무 리스크 주의 필요`,
     risk: gradeToRisk(s.grade),
-    sourceName: "구매팀 AI 평가 결과",
-    publishedAt: `2026-09-0${(idx % 3) + 1} 11:00`,
+    sourceName: "구매팀 AI 평가 결과 (뉴스 크롤링 결과 없음)",
+    publishedAt: "-",
   }));
 
-  const excellent = suppliers.filter(
-    (s) => s.grade === "최우수 (Excellent)" || s.grade === "우수 (Good)"
-  );
-  const positiveSample: SupplierNewsItem[] = excellent.slice(0, 3).map((s, idx) => ({
-    id: `n-pos-${s.id}`,
-    supplierName: s.name,
-    headline: `종합점수 ${s.totalScore}점, 우량 공급업체로 재평가`,
-    category: "기타",
-    risk: "하",
-    sourceName: "구매팀 AI 평가 결과",
-    publishedAt: `2026-08-2${8 + idx} 10:00`,
-  }));
-
-  return [...fromNotes, ...fromGrade, ...positiveSample];
+  return [...fromLive, ...fromInternal];
 }
 
 export async function fetchLogisticsStatus(): Promise<LogisticsItem[]> {
