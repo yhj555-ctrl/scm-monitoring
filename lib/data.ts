@@ -1,3 +1,5 @@
+import { suppliers, gradeToRisk } from "./suppliers";
+
 export type RiskLevel = "상" | "중" | "하";
 
 export interface MaterialPrice {
@@ -68,13 +70,55 @@ export async function fetchMaterialPrices(): Promise<MaterialPrice[]> {
   ];
 }
 
+/**
+ * 공급업체 뉴스 목록.
+ * 업체명·평가등급·비고(참고사항)는 "주요_공급업체_99개_AI평가기준_스코어링" 원본의 실제 평가
+ * 데이터(lib/suppliers.ts)를 그대로 사용합니다. headline/sourceName/publishedAt은 아직 외부
+ * 뉴스 API가 연동되지 않아 평가 결과를 바탕으로 생성한 예시 문구입니다.
+ * 실제 연동 시: 이 함수 내부를 뉴스 API(빅카인즈 등) 호출 결과로 교체하고,
+ * suppliers 배열의 업체명을 검색 키워드로 사용하면 됩니다.
+ */
 export async function fetchSupplierNews(): Promise<SupplierNewsItem[]> {
-  return [
-    { id: "n1", supplierName: "A정밀", headline: "자금 유동성 악화 관련 보도", category: "재무", risk: "상", sourceName: "연합인포맥스", publishedAt: "2026-09-02 18:11" },
-    { id: "n2", supplierName: "B산업", headline: "하도급 대금 지급 지연 논란", category: "법적분쟁", risk: "중", sourceName: "이데일리", publishedAt: "2026-09-02 14:02" },
-    { id: "n3", supplierName: "C소재", headline: "탄소배출 저감 설비 투자 발표", category: "ESG", risk: "하", sourceName: "머니투데이", publishedAt: "2026-09-01 10:45" },
-    { id: "n4", supplierName: "D전자", headline: "대표이사 변경 공시", category: "경영권", risk: "중", sourceName: "전자공시(DART)", publishedAt: "2026-08-31 16:20" },
-  ];
+  const riskFlagged = suppliers.filter((s) => gradeToRisk(s.grade) !== "하" && s.note);
+  const fromNotes: SupplierNewsItem[] = riskFlagged.map((s, idx) => ({
+    id: `n-note-${s.id}`,
+    supplierName: s.name,
+    headline: `[내부 평가] ${s.note} — 최종등급 ${s.grade}`,
+    category: "재무",
+    risk: gradeToRisk(s.grade),
+    sourceName: "구매팀 AI 평가 결과",
+    publishedAt: `2026-09-0${(idx % 3) + 1} 09:00`,
+  }));
+
+  const riskGradeOnly = suppliers.filter(
+    (s) =>
+      (s.grade === "위험 (Risk)" || s.grade === "위험 (Risk) - 과락" || s.grade === "유의 (Caution)") &&
+      !s.note
+  );
+  const fromGrade: SupplierNewsItem[] = riskGradeOnly.slice(0, 6).map((s, idx) => ({
+    id: `n-grade-${s.id}`,
+    supplierName: s.name,
+    headline: `종합점수 ${s.totalScore}점, 최종등급 ${s.grade}로 재무 리스크 주의 필요`,
+    category: "재무",
+    risk: gradeToRisk(s.grade),
+    sourceName: "구매팀 AI 평가 결과",
+    publishedAt: `2026-09-0${(idx % 3) + 1} 11:00`,
+  }));
+
+  const excellent = suppliers.filter(
+    (s) => s.grade === "최우수 (Excellent)" || s.grade === "우수 (Good)"
+  );
+  const positiveSample: SupplierNewsItem[] = excellent.slice(0, 3).map((s, idx) => ({
+    id: `n-pos-${s.id}`,
+    supplierName: s.name,
+    headline: `종합점수 ${s.totalScore}점, 우량 공급업체로 재평가`,
+    category: "기타",
+    risk: "하",
+    sourceName: "구매팀 AI 평가 결과",
+    publishedAt: `2026-08-2${8 + idx} 10:00`,
+  }));
+
+  return [...fromNotes, ...fromGrade, ...positiveSample];
 }
 
 export async function fetchLogisticsStatus(): Promise<LogisticsItem[]> {
@@ -99,15 +143,17 @@ export async function fetchDashboardSummary(): Promise<DashboardSummary> {
     fetchSupplierNews(),
     fetchLogisticsStatus(),
   ]);
+  const supplierHighRisk = suppliers.filter((s) => gradeToRisk(s.grade) === "상").length;
   const highRiskCount =
     materials.filter((m) => m.risk === "상").length +
     news.filter((n) => n.risk === "상").length +
-    logistics.filter((l) => l.risk === "상").length;
+    logistics.filter((l) => l.risk === "상").length +
+    supplierHighRisk;
 
   return {
-    totalMonitoredItems: materials.length + news.length + logistics.length,
+    totalMonitoredItems: materials.length + news.length + logistics.length + suppliers.length,
     highRiskCount,
-    activeSuppliers: new Set(news.map((n) => n.supplierName)).size + 12,
+    activeSuppliers: suppliers.length,
     recentlyUpdated: news.length + logistics.length,
   };
 }

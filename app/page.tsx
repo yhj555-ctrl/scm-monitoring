@@ -1,3 +1,4 @@
+import Link from "next/link";
 import MetricCard from "@/components/MetricCard";
 import RiskBadge from "@/components/RiskBadge";
 import {
@@ -6,6 +7,7 @@ import {
   fetchLogisticsStatus,
   fetchMaterialPrices,
 } from "@/lib/data";
+import { suppliers, gradeToRisk } from "@/lib/suppliers";
 
 export const revalidate = 300; // 5분마다 재검증 (실 API 연동 시 조정)
 
@@ -34,6 +36,11 @@ export default async function DashboardPage() {
     .sort((a, b) => (a.time < b.time ? 1 : -1))
     .slice(0, 6);
 
+  const topRiskSuppliers = [...suppliers]
+    .filter((s) => gradeToRisk(s.grade) !== "하")
+    .sort((a, b) => (a.totalScore ?? 999) - (b.totalScore ?? 999))
+    .slice(0, 5);
+
   return (
     <>
       <h1>SCM 리스크 모니터링 대시보드</h1>
@@ -48,6 +55,39 @@ export default async function DashboardPage() {
         />
         <MetricCard label="관리 대상 공급업체" value={`${summary.activeSuppliers}개`} />
         <MetricCard label="최근 24시간 업데이트" value={`${summary.recentlyUpdated}건`} />
+      </div>
+
+      <div className="panel" style={{ marginBottom: 24 }}>
+        <div className="panel-header panel-header-link">
+          <span>업체평가 리스크 TOP 5</span>
+          <Link href="/suppliers" className="panel-link">
+            전체 {suppliers.length}개 보기 →
+          </Link>
+        </div>
+        <table>
+          <thead>
+            <tr>
+              <th>업체명</th>
+              <th>유형</th>
+              <th>종합점수</th>
+              <th>최종등급</th>
+              <th>리스크</th>
+            </tr>
+          </thead>
+          <tbody>
+            {topRiskSuppliers.map((s) => (
+              <tr key={s.id}>
+                <td>{s.name}</td>
+                <td>{s.category ?? "-"}</td>
+                <td>{s.totalScore ?? "-"}</td>
+                <td>{s.grade}</td>
+                <td>
+                  <RiskBadge risk={gradeToRisk(s.grade)} />
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
       </div>
 
       <div className="panel" style={{ marginBottom: 24 }}>

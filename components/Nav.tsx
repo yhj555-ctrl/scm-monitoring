@@ -2,6 +2,7 @@ import Link from "next/link";
 
 const links = [
   { href: "/", label: "리스크 대시보드" },
+  { href: "/suppliers", label: "업체평가 리스크관리" },
   { href: "/materials", label: "원자재 가격" },
   { href: "/news", label: "공급업체 뉴스" },
   { href: "/logistics", label: "물류 리드타임" },

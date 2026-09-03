@@ -174,3 +174,75 @@ tr:last-child td {
 .change-down {
   color: var(--accent);
 }
+
+.panel-header-link {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.panel-link {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--accent);
+  text-decoration: none;
+}
+
+.panel-link:hover {
+  text-decoration: underline;
+}
+
+.supplier-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.supplier-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.supplier-search,
+.supplier-select {
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 6px 10px;
+  font-size: 13px;
+  background: var(--bg);
+  color: var(--text);
+}
+
+.supplier-search {
+  width: 200px;
+}
+
+.supplier-sort-btn {
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 6px 12px;
+  font-size: 13px;
+  background: var(--card);
+  color: var(--text);
+  cursor: pointer;
+}
+
+.supplier-sort-btn:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.supplier-table-scroll {
+  max-height: 560px;
+  overflow-y: auto;
+}
+
+.grade-text {
+  display: block;
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-top: 2px;
+}
