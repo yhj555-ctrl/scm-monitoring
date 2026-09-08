@@ -60,6 +60,23 @@ PR팀의 `pr-monitoring-v2` 구조(메인 대시보드 + 소스별 서브 모니
 API 키가 필요한 경우 Vercel 프로젝트의 Settings > Environment Variables에 등록하고,
 `process.env.YOUR_KEY` 형태로 불러오세요.
 
+## 로그인 (아이디/비밀번호)
+
+모든 페이지는 로그인 후에만 접근할 수 있습니다. 미인증 상태로 접근하면 `/login` 으로
+이동합니다.
+
+- 기본 계정: **아이디 `procurement` / 비밀번호 `rnaoxla2026!`**
+- 계정·비밀키는 환경변수로 덮어쓸 수 있습니다 (`.env.example` 참고):
+  - `AUTH_USERNAME`, `AUTH_PASSWORD`
+  - `AUTH_SECRET` — 세션 쿠키 서명용 비밀키. **Vercel 배포 시 Settings > Environment
+    Variables 에 임의의 긴 문자열로 반드시 설정하세요** (`openssl rand -hex 32`).
+    미설정 시 개발용 기본값이 쓰여 세션 위조에 취약합니다.
+
+로그인하면 12시간짜리 httpOnly 세션 쿠키(`scm_session`)가 발급되고, 우측 상단
+"로그아웃" 버튼으로 해제할 수 있습니다. 인증 처리는 `middleware.ts` + `lib/auth.ts` +
+`app/api/auth/*` 에 있습니다. 크론 엔드포인트(`/api/cron/refresh`)는 기존 `CRON_SECRET`
+방식을 그대로 유지합니다.
+
 ## 로컬 실행
 
 ```bash
@@ -74,5 +91,7 @@ npm run dev
 1. 이 폴더를 GitHub 저장소에 push (실제 재무 데이터가 포함되어 있으니 **Private 저장소** 권장)
 2. vercel.com에서 GitHub 계정으로 로그인
 3. "Add New... > Project"에서 해당 저장소 선택 (Next.js는 자동 감지됨)
-4. Deploy — `vercel.json`의 크론이 자동으로 등록됩니다
-5. 배포 완료 시 `https://프로젝트이름.vercel.app` 주소 생성
+4. **Settings > Environment Variables** 에 `AUTH_SECRET` (임의의 긴 문자열) 등록.
+   계정을 바꾸려면 `AUTH_USERNAME` / `AUTH_PASSWORD` 도 함께 등록
+5. Deploy — `vercel.json`의 크론이 자동으로 등록됩니다
+6. 배포 완료 시 `https://프로젝트이름.vercel.app` 주소 생성

@@ -1,4 +1,7 @@
+"use client";
+
 import Link from "next/link";
+import { usePathname, useRouter } from "next/navigation";
 
 const links = [
   { href: "/", label: "리스크 대시보드" },
@@ -10,6 +13,18 @@ const links = [
 ];
 
 export default function Nav() {
+  const pathname = usePathname();
+  const router = useRouter();
+
+  // 로그인 화면에서는 상단 네비게이션을 숨깁니다.
+  if (pathname === "/login") return null;
+
+  async function handleLogout() {
+    await fetch("/api/auth/logout", { method: "POST" });
+    router.replace("/login");
+    router.refresh();
+  }
+
   return (
     <header className="nav">
       <div className="nav-title">구매팀 SCM 모니터링</div>
@@ -20,6 +35,9 @@ export default function Nav() {
           </Link>
         ))}
       </nav>
+      <button type="button" className="nav-logout" onClick={handleLogout}>
+        로그아웃
+      </button>
     </header>
   );
 }
