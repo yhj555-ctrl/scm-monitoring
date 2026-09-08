@@ -9,6 +9,7 @@ export interface LiveMaterialPrice {
   source: string;
   live: boolean;
   note?: string;
+  marketTime?: number; // 시세 기준 시각 (unix seconds, Yahoo regularMarketTime)
 }
 
 interface YahooChartResponse {
@@ -18,6 +19,7 @@ interface YahooChartResponse {
         regularMarketPrice: number;
         chartPreviousClose: number;
         currency: string;
+        regularMarketTime?: number;
       };
     }[];
     error: unknown;
@@ -86,6 +88,7 @@ export async function fetchLiveMetalPrices(): Promise<LiveMaterialPrice[]> {
         changeRate: Math.round(changeRate * 100) / 100,
         source: "Yahoo Finance",
         live: true,
+        marketTime: meta.regularMarketTime,
       } as LiveMaterialPrice;
     })
   );

@@ -15,6 +15,7 @@ export interface MaterialPrice {
   source: string;
   live: boolean;
   note?: string;
+  marketTime?: number; // 시세 기준 시각 (unix seconds)
 }
 
 export interface SupplierNewsItem {
@@ -86,6 +87,7 @@ export async function fetchMaterialPrices(): Promise<MaterialPrice[]> {
     source: m.source,
     live: m.live,
     note: m.note,
+    marketTime: m.marketTime,
   }));
 }
 
