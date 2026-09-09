@@ -42,7 +42,7 @@ const FALLBACK_RATES: FxRate[] = [
 export async function fetchLiveExchangeRates(): Promise<{ rates: FxRate[]; asOf: string; live: boolean }> {
   const data = await safeFetchJson<FrankfurterResponse>(
     "https://api.frankfurter.dev/v1/latest?base=USD&symbols=KRW,JPY,EUR,CNY",
-    { revalidateSeconds: 1800, timeoutMs: 6000, tags: ["fx-rates"] }
+    { revalidateSeconds: 86400, timeoutMs: 6000, tags: ["fx-rates"] }
   );
 
   if (!data || !data.rates || Object.keys(data.rates).length === 0) {

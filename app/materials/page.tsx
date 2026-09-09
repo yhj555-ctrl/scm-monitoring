@@ -1,27 +1,20 @@
 import RiskBadge from "@/components/RiskBadge";
-import { fetchMaterialPrices, fetchExchangeRates } from "@/lib/data";
+import { fetchMaterialPrices, fetchExchangeRates, fetchCommodityNews } from "@/lib/data";
+import { kstDateTime } from "@/lib/time";
 
-// 이 페이지는 외부 실시간 소스(Yahoo Finance, Frankfurter)를 호출합니다.
-// 매 요청마다 최대 30분 캐시된 값을 쓰고, 매일 09시(KST)에 /api/cron/refresh 가 캐시를 무효화합니다.
-export const revalidate = 1800;
-
-function kst(date: Date): string {
-  return date.toLocaleString("ko-KR", {
-    timeZone: "Asia/Seoul",
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
-}
+// 외부 실시간 소스(Yahoo Finance, Frankfurter, Google 뉴스)를 호출합니다.
+// 하루 캐시 + 매일 08:00(KST) /api/cron/refresh 가 캐시를 무효화합니다.
+export const revalidate = 86400;
 
 export default async function MaterialsPage() {
-  const [materials, fx] = await Promise.all([fetchMaterialPrices(), fetchExchangeRates()]);
+  const [materials, fx, news] = await Promise.all([
+    fetchMaterialPrices(),
+    fetchExchangeRates(),
+    fetchCommodityNews(),
+  ]);
 
   // 이 페이지(캐시 스냅샷)가 생성된 시각 = 실시간 소스를 마지막으로 조회한 시각.
-  // 30분마다 또는 매일 09시(KST) 크론에서 갱신됩니다.
-  const refreshedAt = kst(new Date());
+  const refreshedAt = kstDateTime(new Date());
 
   const latestMarketTime = materials
     .map((m) => m.marketTime ?? 0)
@@ -31,16 +24,16 @@ export default async function MaterialsPage() {
     <>
       <h1>원자재 · 환율 모니터링</h1>
       <p className="page-subtitle">
-        Yahoo Finance / Frankfurter 실시간 조회 · 30분 캐시, 매일 09:00(KST) 자동 갱신
+        Yahoo Finance / Frankfurter / Google 뉴스 · 매일 08:00(KST) 자동 갱신
       </p>
       <p className="page-meta">
         마지막 갱신 시각(KST): <strong>{refreshedAt}</strong>
         {latestMarketTime > 0 && (
-          <> · 시세 기준: {kst(new Date(latestMarketTime * 1000))}</>
+          <> · 시세 기준: {kstDateTime(new Date(latestMarketTime * 1000))}</>
         )}
       </p>
 
-      <div className="panel" style={{ marginBottom: 24 }}>
+      <div className="panel">
         <div className="panel-header panel-header-link">
           <span>환율 (1 USD 기준)</span>
           <span className="panel-link" style={{ cursor: "default" }}>
@@ -107,7 +100,9 @@ export default async function MaterialsPage() {
                 <td className={m.changeRate >= 0 ? "change-up" : "change-down"}>
                   {m.live ? `${m.changeRate >= 0 ? "+" : ""}${m.changeRate}%` : "-"}
                 </td>
-                <td>{m.live && m.marketTime ? kst(new Date(m.marketTime * 1000)) : "-"}</td>
+                <td>
+                  {m.live && m.marketTime ? kstDateTime(new Date(m.marketTime * 1000)) : "-"}
+                </td>
                 <td>{m.source}</td>
                 <td>
                   <RiskBadge risk={m.risk} />
@@ -116,6 +111,37 @@ export default async function MaterialsPage() {
             ))}
           </tbody>
         </table>
+      </div>
+
+      <div className="panel">
+        <div className="panel-header">원자재 · 환율 관련 최신 뉴스</div>
+        {news.length === 0 ? (
+          <div className="panel-footnote">
+            현재 수집된 뉴스가 없습니다. 다음 갱신(매일 08:00 KST) 때 다시 시도합니다.
+          </div>
+        ) : (
+          <ul className="news-list">
+            {news.map((n) => (
+              <li key={n.id}>
+                <a
+                  href={n.link}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="news-headline"
+                >
+                  {n.title}
+                </a>
+                <div className="news-meta">
+                  <span>{n.topic}</span>
+                  <span className="dot">{n.source}</span>
+                  <span className="dot">
+                    {n.publishedAt ? kstDateTime(new Date(n.publishedAt)) : "게재시각 미상"}
+                  </span>
+                </div>
+              </li>
+            ))}
+          </ul>
+        )}
       </div>
     </>
   );

@@ -70,7 +70,7 @@ export async function fetchLiveMetalPrices(): Promise<LiveMaterialPrice[]> {
       const data = await safeFetchJson<YahooChartResponse>(
         `https://query1.finance.yahoo.com/v8/finance/chart/${t.symbol}?interval=1d&range=5d`,
         {
-          revalidateSeconds: 1800,
+          revalidateSeconds: 86400,
           timeoutMs: 6000,
           tags: ["metal-prices"],
           headers: { "User-Agent": "Mozilla/5.0 (compatible; SCM-Monitoring-Bot/1.0)" },

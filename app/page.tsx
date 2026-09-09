@@ -8,8 +8,9 @@ import {
   fetchMaterialPrices,
 } from "@/lib/data";
 import { suppliers, gradeToRisk } from "@/lib/suppliers";
+import { kstDateTime } from "@/lib/time";
 
-export const revalidate = 1800; // 30분 캐시 + 매일 09:00(KST) /api/cron/refresh 로 강제 갱신
+export const revalidate = 86400; // 하루 캐시 + 매일 08:00(KST) /api/cron/refresh 로 강제 갱신
 
 export default async function DashboardPage() {
   const [summary, news, logistics, materials] = await Promise.all([
@@ -20,20 +21,24 @@ export default async function DashboardPage() {
   ]);
 
   const recentEvents = [
-    ...news.map((n) => ({
-      id: n.id,
-      time: n.publishedAt,
-      label: `${n.supplierName} · ${n.headline}`,
-      risk: n.risk,
-    })),
+    ...news
+      .filter((n) => n.publishedTs > 0)
+      .map((n) => ({
+        id: n.id,
+        ts: n.publishedTs,
+        time: kstDateTime(new Date(n.publishedTs)),
+        label: `${n.supplierName} · ${n.headline}`,
+        risk: n.risk,
+      })),
     ...logistics.map((l) => ({
       id: l.id,
+      ts: Number.MAX_SAFE_INTEGER, // 오늘자 스냅샷 — 항상 상단
       time: l.updatedAt,
       label: `${l.route} · ${l.status}`,
       risk: l.risk,
     })),
   ]
-    .sort((a, b) => (a.time < b.time ? 1 : -1))
+    .sort((a, b) => b.ts - a.ts)
     .slice(0, 6);
 
   const topRiskSuppliers = [...suppliers]
@@ -44,7 +49,10 @@ export default async function DashboardPage() {
   return (
     <>
       <h1>SCM 리스크 모니터링 대시보드</h1>
-      <p className="page-subtitle">공급업체 · 원자재 · 물류 · 입찰 통합 리스크 현황</p>
+      <p className="page-subtitle">공급업체 · 원자재 · 환율 · 물류 통합 리스크 현황</p>
+      <p className="page-meta">
+        마지막 갱신 시각(KST): <strong>{kstDateTime(new Date())}</strong> · 매일 08:00(KST) 자동 갱신
+      </p>
 
       <div className="metric-grid">
         <MetricCard label="총 모니터링 항목" value={`${summary.totalMonitoredItems}건`} />
@@ -57,7 +65,7 @@ export default async function DashboardPage() {
         <MetricCard label="최근 24시간 업데이트" value={`${summary.recentlyUpdated}건`} />
       </div>
 
-      <div className="panel" style={{ marginBottom: 24 }}>
+      <div className="panel">
         <div className="panel-header panel-header-link">
           <span>업체평가 리스크 TOP 5</span>
           <Link href="/suppliers" className="panel-link">
@@ -90,12 +98,12 @@ export default async function DashboardPage() {
         </table>
       </div>
 
-      <div className="panel" style={{ marginBottom: 24 }}>
+      <div className="panel">
         <div className="panel-header">최근 수집 이슈</div>
         <table>
           <thead>
             <tr>
-              <th>시각</th>
+              <th>시각(KST)</th>
               <th>내용</th>
               <th>리스크</th>
             </tr>
@@ -115,7 +123,12 @@ export default async function DashboardPage() {
       </div>
 
       <div className="panel">
-        <div className="panel-header">주요 원자재 시세 요약</div>
+        <div className="panel-header panel-header-link">
+          <span>주요 원자재 시세 요약</span>
+          <Link href="/materials" className="panel-link">
+            원자재 · 환율 전체 →
+          </Link>
+        </div>
         <table>
           <thead>
             <tr>

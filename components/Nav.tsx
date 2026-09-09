@@ -9,7 +9,6 @@ const links = [
   { href: "/materials", label: "원자재·환율" },
   { href: "/news", label: "공급업체 뉴스" },
   { href: "/logistics", label: "물류 리드타임" },
-  { href: "/bidding", label: "입찰 계약" },
 ];
 
 export default function Nav() {

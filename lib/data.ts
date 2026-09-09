@@ -1,7 +1,11 @@
+import { unstable_cache } from "next/cache";
 import { suppliers, gradeToRisk } from "./suppliers";
-import { fetchLiveSupplierNews } from "./live/news";
-import { fetchLiveExchangeRates, FxRate } from "./live/fx";
+import { fetchLiveSupplierNews, fetchLiveCommodityNews } from "./live/news";
+import type { CommodityNewsItem } from "./live/news";
+import { fetchLiveExchangeRates } from "./live/fx";
+import type { FxRate } from "./live/fx";
 import { fetchLiveMetalPrices } from "./live/metals";
+import { kstDate, kstTodayEightAM } from "./time";
 
 export type RiskLevel = "상" | "중" | "하";
 
@@ -25,27 +29,23 @@ export interface SupplierNewsItem {
   link?: string;
   risk: RiskLevel;
   sourceName: string;
-  publishedAt: string;
+  publishedAt: string; // ISO 문자열 또는 "-"
+  publishedTs: number; // 정렬용 epoch ms (0 = 알 수 없음)
 }
 
 export interface LogisticsItem {
   id: string;
-  route: string; // e.g. "상하이 -> 부산"
+  region: "중국" | "대만" | "미국";
+  route: string; // e.g. "상하이 → 로스앤젤레스"
   carrier: string;
+  mode: "해상" | "항공" | "내륙";
+  leadTimeDays: number; // 현재 예상 리드타임
+  baselineDays: number; // 평시 기준 리드타임
   status: "정상" | "지연" | "지연 심각";
   delayDays: number;
   risk: RiskLevel;
   updatedAt: string;
-}
-
-export interface BiddingItem {
-  id: string;
-  projectName: string;
-  supplierName: string;
-  stage: "공고" | "입찰마감" | "낙찰" | "계약체결";
-  amount: number; // KRW
-  competitorCount: number;
-  updatedAt: string;
+  note?: string;
 }
 
 export interface DashboardSummary {
@@ -55,16 +55,18 @@ export interface DashboardSummary {
   recentlyUpdated: number;
 }
 
+export type { CommodityNewsItem };
+
 /**
  * 실시간 데이터 소스 (모두 lib/live/*.ts):
- *  - fetchMaterialPrices  -> Yahoo Finance(비공식, 구리/알루미늄/금/원유) + 환율(Frankfurter.app)
- *  - fetchSupplierNews    -> Google 뉴스 RSS 실시간 크롤링 (내부 평가 위험/유의 등급 업체 우선)
- *  - fetchLogisticsStatus / fetchBiddingStatus -> 아직 목업. 아래 함수 내부만 교체하면 됩니다:
- *      물류: 선사/포워더 API, 관세청 수출입 통관 정보
- *      입찰: 나라장터(조달청) API, 사내 ERP/SRM 연동
+ *  - fetchMaterialPrices  -> Yahoo Finance(비공식, 구리/알루미늄/금/원유) + 환율(Frankfurter)
+ *  - fetchSupplierNews    -> Google 뉴스 RSS 실시간 크롤링 (내부 평가 위험/유의 등급 업체 우선, 최신순 정렬)
+ *  - fetchCommodityNews   -> Google 뉴스 RSS (원자재·환율 주제, 최신순)
+ *  - fetchLogisticsStatus -> 중국·대만·미국 구간 목업 스냅샷 (매일 08:00 KST 기준)
  *
- * 캐시: 각 실시간 fetch는 30분(1800초) 캐시 + 태그(supplier-news / fx-rates / metal-prices)를
- * 가지고 있어, /api/cron/refresh 가 매일 09시(KST)에 태그를 무효화하여 즉시 새로 고칩니다.
+ * 캐시: 각 실시간 fetch는 하루(86400초) 캐시 + 태그(supplier-news / commodity-news /
+ * fx-rates / metal-prices / logistics)를 가지고 있어, /api/cron/refresh 가 매일 08:00(KST)에
+ * 태그를 무효화하여 다음 요청 때 새로 고칩니다.
  */
 
 function materialRisk(m: { live: boolean; changeRate: number }): RiskLevel {
@@ -95,10 +97,15 @@ export async function fetchExchangeRates(): Promise<{ rates: FxRate[]; asOf: str
   return fetchLiveExchangeRates();
 }
 
+/** 원자재·환율 관련 최신 뉴스 (최신순). */
+export async function fetchCommodityNews(): Promise<CommodityNewsItem[]> {
+  return fetchLiveCommodityNews();
+}
+
 /**
  * 공급업체 뉴스.
- * Google 뉴스 RSS로 실시간 크롤링한 결과(fromLive)를 우선 사용하고,
- * 크롤링이 비어 있는 업체는 내부 평가 데이터(비고/등급) 기반 항목으로 보완합니다.
+ * Google 뉴스 RSS로 실시간 크롤링한 결과(fromLive, 게재시각 최신순)를 우선 사용하고,
+ * 크롤링이 비어 있는 위험/유의 업체는 내부 평가 데이터(비고/등급) 기반 항목으로 뒤에 보완합니다.
  */
 export async function fetchSupplierNews(): Promise<SupplierNewsItem[]> {
   const liveItems = await fetchLiveSupplierNews();
@@ -109,8 +116,12 @@ export async function fetchSupplierNews(): Promise<SupplierNewsItem[]> {
     link: n.link,
     risk: n.risk,
     sourceName: n.source,
-    publishedAt: n.publishedAt,
+    publishedAt: n.publishedAt || "-",
+    publishedTs: n.publishedTs,
   }));
+
+  // 이미 news.ts 에서 최신순 정렬되어 있으나, 매핑 이후 한 번 더 보장합니다.
+  fromLive.sort((a, b) => b.publishedTs - a.publishedTs);
 
   const coveredNames = new Set(liveItems.map((n) => n.supplierName));
   const riskFlagged = suppliers.filter(
@@ -125,25 +136,46 @@ export async function fetchSupplierNews(): Promise<SupplierNewsItem[]> {
     risk: gradeToRisk(s.grade),
     sourceName: "구매팀 AI 평가 결과 (뉴스 크롤링 결과 없음)",
     publishedAt: "-",
+    publishedTs: 0,
   }));
 
   return [...fromLive, ...fromInternal];
 }
 
-export async function fetchLogisticsStatus(): Promise<LogisticsItem[]> {
-  return [
-    { id: "l1", route: "상하이 -> 부산", carrier: "HMM", status: "정상", delayDays: 0, risk: "하", updatedAt: "2026-09-03 07:00" },
-    { id: "l2", route: "호치민 -> 인천", carrier: "Maersk", status: "지연", delayDays: 3, risk: "중", updatedAt: "2026-09-03 07:00" },
-    { id: "l3", route: "칭다오 -> 평택", carrier: "고려해운", status: "지연 심각", delayDays: 9, risk: "상", updatedAt: "2026-09-03 06:40" },
-  ];
-}
+/**
+ * 물류 리드타임 — 중국·대만·미국 위주 구간 스냅샷.
+ * 아직 목업입니다. 실제 연동 시 이 함수 내부만 교체하세요:
+ *   선사/포워더 스케줄 API, Freightos/Drewry 운임지수, 미국 항만(LA/LB) 대기 데이터,
+ *   관세청 수출입 통관 정보 등.
+ * updatedAt 은 매일 08:00(KST) 기준으로 표기됩니다.
+ */
+export const fetchLogisticsStatus = unstable_cache(
+  async (): Promise<LogisticsItem[]> => buildLogisticsSnapshot(),
+  ["logistics-snapshot"],
+  { revalidate: 86400, tags: ["logistics"] }
+);
 
-export async function fetchBiddingStatus(): Promise<BiddingItem[]> {
-  return [
-    { id: "b1", projectName: "2026 사출성형 부품 연간단가", supplierName: "A정밀", stage: "낙찰", amount: 820000000, competitorCount: 4, updatedAt: "2026-09-01" },
-    { id: "b2", projectName: "물류센터 자동화 설비", supplierName: "미정", stage: "입찰마감", amount: 1520000000, competitorCount: 6, updatedAt: "2026-09-02" },
-    { id: "b3", projectName: "포장재 3년 장기계약", supplierName: "C소재", stage: "계약체결", amount: 430000000, competitorCount: 3, updatedAt: "2026-08-28" },
+function buildLogisticsSnapshot(): LogisticsItem[] {
+  const updatedAt = kstDate(kstTodayEightAM()) + " 08:00";
+
+  const base: Omit<LogisticsItem, "status" | "risk" | "updatedAt">[] = [
+    { id: "cn-la", region: "중국", route: "상하이 → 로스앤젤레스", carrier: "COSCO", mode: "해상", leadTimeDays: 19, baselineDays: 16, delayDays: 3, note: "미 서안 항만 혼잡 소폭 증가" },
+    { id: "cn-ny", region: "중국", route: "선전 → 뉴욕(뉴어크)", carrier: "MSC", mode: "해상", leadTimeDays: 34, baselineDays: 30, delayDays: 4, note: "파나마 운하 통항 제한 영향" },
+    { id: "cn-sav", region: "중국", route: "칭다오 → 서배너", carrier: "ONE", mode: "해상", leadTimeDays: 32, baselineDays: 31, delayDays: 1 },
+    { id: "cn-air", region: "중국", route: "상하이(PVG) → 시카고(ORD)", carrier: "대한항공 카고", mode: "항공", leadTimeDays: 4, baselineDays: 3, delayDays: 1, note: "이커머스 물량으로 스페이스 타이트" },
+    { id: "tw-la", region: "대만", route: "가오슝 → 로스앤젤레스", carrier: "Evergreen", mode: "해상", leadTimeDays: 16, baselineDays: 15, delayDays: 1 },
+    { id: "tw-sea", region: "대만", route: "지룽 → 시애틀·터코마", carrier: "Yang Ming", mode: "해상", leadTimeDays: 15, baselineDays: 14, delayDays: 1 },
+    { id: "tw-air", region: "대만", route: "타이베이(TPE) → 로스앤젤레스(LAX)", carrier: "China Airlines 카고", mode: "항공", leadTimeDays: 3, baselineDays: 2, delayDays: 1, note: "반도체 장비 우선 선적" },
+    { id: "us-inland", region: "미국", route: "로스앤젤레스 → 시카고 (내륙 철송)", carrier: "BNSF", mode: "내륙", leadTimeDays: 9, baselineDays: 6, delayDays: 3, note: "내륙 철도 컨테이너 적체" },
+    { id: "us-hou", region: "미국", route: "휴스턴 → 부산 (수입 역물류)", carrier: "HMM", mode: "해상", leadTimeDays: 41, baselineDays: 38, delayDays: 3, note: "걸프 지역 기상 지연" },
   ];
+
+  return base.map((b) => {
+    const status: LogisticsItem["status"] =
+      b.delayDays >= 5 ? "지연 심각" : b.delayDays >= 2 ? "지연" : "정상";
+    const risk: RiskLevel = b.delayDays >= 5 ? "상" : b.delayDays >= 2 ? "중" : "하";
+    return { ...b, status, risk, updatedAt };
+  });
 }
 
 export async function fetchDashboardSummary(): Promise<DashboardSummary> {
