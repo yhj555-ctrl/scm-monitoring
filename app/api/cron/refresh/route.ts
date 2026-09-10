@@ -16,6 +16,7 @@ const TAGS = [
   "fx-rates",
   "metal-prices",
   "logistics",
+  "dart-disclosures",
 ];
 
 export async function GET(request: NextRequest) {

@@ -2,8 +2,8 @@
 
 const KST = "Asia/Seoul";
 
-/** KST 기준 연·월·일·시·분을 숫자로 분해 */
-function kstParts(date: Date) {
+/** KST 기준 연·월·일·시·분 문자열("2026","09"...)로 분해 */
+export function kstParts(date: Date) {
   const f = new Intl.DateTimeFormat("en-CA", {
     timeZone: KST,
     year: "numeric",
@@ -14,7 +14,9 @@ function kstParts(date: Date) {
     hour12: false,
   });
   const map: Record<string, string> = {};
-  for (const p of f.formatToParts(date)) map[p.type] = p.value;
+  f.formatToParts(date).forEach((p) => {
+    map[p.type] = p.value;
+  });
   return {
     year: map.year,
     month: map.month,

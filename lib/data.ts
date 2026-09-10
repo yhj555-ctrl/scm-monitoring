@@ -5,6 +5,8 @@ import type { CommodityNewsItem } from "./live/news";
 import { fetchLiveExchangeRates } from "./live/fx";
 import type { FxRate } from "./live/fx";
 import { fetchLiveMetalPrices } from "./live/metals";
+import { fetchDartDisclosures } from "./live/dart";
+import type { DartResult } from "./live/dart";
 import { kstDate, kstTodayEightAM } from "./time";
 
 export type RiskLevel = "상" | "중" | "하";
@@ -33,13 +35,16 @@ export interface SupplierNewsItem {
   publishedTs: number; // 정렬용 epoch ms (0 = 알 수 없음)
 }
 
+export type LogisticsRegion = "중국" | "대만" | "미국" | "유럽" | "대한민국";
+
 export interface LogisticsItem {
   id: string;
-  region: "중국" | "대만" | "미국";
-  route: string; // e.g. "상하이 → 로스앤젤레스"
+  region: LogisticsRegion;
+  route: string; // e.g. "상하이 → 부산"
+  lane: "수입" | "수출" | "국내"; // 대한민국 기준 방향
   carrier: string;
   mode: "해상" | "항공" | "내륙";
-  leadTimeDays: number; // 현재 예상 리드타임
+  leadTimeDays: number; // 현재 예상 리드타임(대한민국 기준, 일)
   baselineDays: number; // 평시 기준 리드타임
   status: "정상" | "지연" | "지연 심각";
   delayDays: number;
@@ -56,6 +61,12 @@ export interface DashboardSummary {
 }
 
 export type { CommodityNewsItem };
+export type { DartResult, DartSupplierDisclosure, DartFiling } from "./live/dart";
+
+/** 전자공시시스템(DART) 최근 공시 현황 (DART_API_KEY 설정 시). 매일 08:00(KST) 갱신. */
+export async function fetchSupplierDisclosures(): Promise<DartResult> {
+  return fetchDartDisclosures();
+}
 
 /**
  * 실시간 데이터 소스 (모두 lib/live/*.ts):
@@ -158,16 +169,31 @@ export const fetchLogisticsStatus = unstable_cache(
 function buildLogisticsSnapshot(): LogisticsItem[] {
   const updatedAt = kstDate(kstTodayEightAM()) + " 08:00";
 
+  // 리드타임(leadTimeDays)은 모두 "대한민국 기준" 문전~문전 소요일입니다.
   const base: Omit<LogisticsItem, "status" | "risk" | "updatedAt">[] = [
-    { id: "cn-la", region: "중국", route: "상하이 → 로스앤젤레스", carrier: "COSCO", mode: "해상", leadTimeDays: 19, baselineDays: 16, delayDays: 3, note: "미 서안 항만 혼잡 소폭 증가" },
-    { id: "cn-ny", region: "중국", route: "선전 → 뉴욕(뉴어크)", carrier: "MSC", mode: "해상", leadTimeDays: 34, baselineDays: 30, delayDays: 4, note: "파나마 운하 통항 제한 영향" },
-    { id: "cn-sav", region: "중국", route: "칭다오 → 서배너", carrier: "ONE", mode: "해상", leadTimeDays: 32, baselineDays: 31, delayDays: 1 },
-    { id: "cn-air", region: "중국", route: "상하이(PVG) → 시카고(ORD)", carrier: "대한항공 카고", mode: "항공", leadTimeDays: 4, baselineDays: 3, delayDays: 1, note: "이커머스 물량으로 스페이스 타이트" },
-    { id: "tw-la", region: "대만", route: "가오슝 → 로스앤젤레스", carrier: "Evergreen", mode: "해상", leadTimeDays: 16, baselineDays: 15, delayDays: 1 },
-    { id: "tw-sea", region: "대만", route: "지룽 → 시애틀·터코마", carrier: "Yang Ming", mode: "해상", leadTimeDays: 15, baselineDays: 14, delayDays: 1 },
-    { id: "tw-air", region: "대만", route: "타이베이(TPE) → 로스앤젤레스(LAX)", carrier: "China Airlines 카고", mode: "항공", leadTimeDays: 3, baselineDays: 2, delayDays: 1, note: "반도체 장비 우선 선적" },
-    { id: "us-inland", region: "미국", route: "로스앤젤레스 → 시카고 (내륙 철송)", carrier: "BNSF", mode: "내륙", leadTimeDays: 9, baselineDays: 6, delayDays: 3, note: "내륙 철도 컨테이너 적체" },
-    { id: "us-hou", region: "미국", route: "휴스턴 → 부산 (수입 역물류)", carrier: "HMM", mode: "해상", leadTimeDays: 41, baselineDays: 38, delayDays: 3, note: "걸프 지역 기상 지연" },
+    // 중국 ↔ 대한민국
+    { id: "cn-imp-pus", region: "중국", route: "상하이 → 부산", lane: "수입", carrier: "COSCO", mode: "해상", leadTimeDays: 9, baselineDays: 7, delayDays: 2, note: "상하이항 적체·기상 지연" },
+    { id: "cn-imp-icn", region: "중국", route: "선전 → 인천", lane: "수입", carrier: "HMM", mode: "해상", leadTimeDays: 12, baselineDays: 10, delayDays: 2 },
+    { id: "cn-imp-air", region: "중국", route: "상하이(PVG) → 인천(ICN)", lane: "수입", carrier: "아시아나 카고", mode: "항공", leadTimeDays: 3, baselineDays: 2, delayDays: 1, note: "이커머스 물량으로 스페이스 타이트" },
+    { id: "cn-exp-pus", region: "중국", route: "부산 → 칭다오", lane: "수출", carrier: "장금상선", mode: "해상", leadTimeDays: 6, baselineDays: 5, delayDays: 1 },
+    // 대만 ↔ 대한민국
+    { id: "tw-imp-pus", region: "대만", route: "가오슝 → 부산", lane: "수입", carrier: "Evergreen", mode: "해상", leadTimeDays: 8, baselineDays: 7, delayDays: 1 },
+    { id: "tw-imp-air", region: "대만", route: "타이베이(TPE) → 인천(ICN)", lane: "수입", carrier: "China Airlines 카고", mode: "항공", leadTimeDays: 3, baselineDays: 2, delayDays: 1, note: "반도체 장비 우선 선적" },
+    { id: "tw-exp-pus", region: "대만", route: "부산 → 지룽", lane: "수출", carrier: "Yang Ming", mode: "해상", leadTimeDays: 7, baselineDays: 6, delayDays: 1 },
+    // 미국 ↔ 대한민국
+    { id: "us-imp-pus", region: "미국", route: "로스앤젤레스 → 부산", lane: "수입", carrier: "Matson", mode: "해상", leadTimeDays: 18, baselineDays: 15, delayDays: 3, note: "미 서안 항만 혼잡" },
+    { id: "us-imp-ny", region: "미국", route: "뉴욕(뉴어크) → 부산", lane: "수입", carrier: "MSC", mode: "해상", leadTimeDays: 38, baselineDays: 33, delayDays: 5, note: "파나마 운하 통항 제한 영향" },
+    { id: "us-imp-air", region: "미국", route: "로스앤젤레스(LAX) → 인천(ICN)", lane: "수입", carrier: "대한항공 카고", mode: "항공", leadTimeDays: 4, baselineDays: 3, delayDays: 1 },
+    { id: "us-exp-pus", region: "미국", route: "부산 → 로스앤젤레스", lane: "수출", carrier: "HMM", mode: "해상", leadTimeDays: 16, baselineDays: 14, delayDays: 2 },
+    // 유럽 ↔ 대한민국
+    { id: "eu-imp-pus", region: "유럽", route: "로테르담 → 부산", lane: "수입", carrier: "Maersk", mode: "해상", leadTimeDays: 34, baselineDays: 28, delayDays: 6, note: "홍해 우회로 희망봉 경유 지속" },
+    { id: "eu-imp-ham", region: "유럽", route: "함부르크 → 부산", lane: "수입", carrier: "Hapag-Lloyd", mode: "해상", leadTimeDays: 35, baselineDays: 29, delayDays: 6, note: "희망봉 우회" },
+    { id: "eu-imp-air", region: "유럽", route: "프랑크푸르트(FRA) → 인천(ICN)", lane: "수입", carrier: "루프트한자 카고", mode: "항공", leadTimeDays: 4, baselineDays: 3, delayDays: 1 },
+    { id: "eu-exp-pus", region: "유럽", route: "부산 → 앤트워프", lane: "수출", carrier: "CMA CGM", mode: "해상", leadTimeDays: 33, baselineDays: 27, delayDays: 6, note: "희망봉 우회" },
+    // 대한민국 국내
+    { id: "kr-pus-ptk", region: "대한민국", route: "부산항 → 평택 (수입 내륙운송)", lane: "국내", carrier: "국내 육상운송", mode: "내륙", leadTimeDays: 2, baselineDays: 1, delayDays: 1, note: "부산항 반출 대기" },
+    { id: "kr-icn-hs", region: "대한민국", route: "인천공항 → 화성 (수입 내륙운송)", lane: "국내", carrier: "국내 육상운송", mode: "내륙", leadTimeDays: 1, baselineDays: 1, delayDays: 0 },
+    { id: "kr-feeder", region: "대한민국", route: "부산 → 광양 (연안 피더)", lane: "국내", carrier: "장금상선", mode: "해상", leadTimeDays: 2, baselineDays: 2, delayDays: 0 },
   ];
 
   return base.map((b) => {

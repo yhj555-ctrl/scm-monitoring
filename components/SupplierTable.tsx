@@ -1,8 +1,12 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { suppliers, gradeToRisk, SupplierGrade } from "@/lib/suppliers";
+import { suppliers, gradeToRisk } from "@/lib/suppliers";
+import type { SupplierGrade, SupplierRecord } from "@/lib/suppliers";
+import type { DartResult } from "@/lib/data";
 import RiskBadge from "./RiskBadge";
+import SupplierDetailModal from "./SupplierDetailModal";
+import { fmtWon, fmtPct } from "@/lib/format";
 
 const GRADE_OPTIONS: (SupplierGrade | "전체")[] = [
   "전체",
@@ -15,20 +19,13 @@ const GRADE_OPTIONS: (SupplierGrade | "전체")[] = [
   "점수 오류",
 ];
 
-function fmtAmount(v: number | null) {
-  if (v === null) return "-";
-  return `${Math.round(v).toLocaleString()}원`;
-}
-
-function fmtPct(v: number | null) {
-  if (v === null) return "-";
-  return `${(v * 100).toFixed(1)}%`;
-}
-
-export default function SupplierTable() {
+export default function SupplierTable({ disclosures }: { disclosures: DartResult }) {
   const [query, setQuery] = useState("");
   const [grade, setGrade] = useState<(typeof GRADE_OPTIONS)[number]>("전체");
   const [sortDesc, setSortDesc] = useState(true);
+  const [selected, setSelected] = useState<SupplierRecord | null>(null);
+
+  const dartConfigured = disclosures.configured === true;
 
   const filtered = useMemo(() => {
     let rows = suppliers.filter((s) => {
@@ -47,6 +44,21 @@ export default function SupplierTable() {
     });
     return rows;
   }, [query, grade, sortDesc]);
+
+  function disclosureCell(supplierId: string) {
+    if (!disclosures.configured) return <span className="dart-cell-muted">미설정</span>;
+    if (!disclosures.ok) return <span className="dart-cell-muted">조회 실패</span>;
+    const d = disclosures.bySupplierId[supplierId];
+    if (!d || d.filings.length === 0) return <span className="dart-cell-muted">매칭 없음</span>;
+    if (d.hasRecent) {
+      return <span className="badge badge-high">신규 {d.filings.length}건</span>;
+    }
+    return (
+      <span className="dart-cell-has">
+        {d.filings.length}건 · {d.latestDate}
+      </span>
+    );
+  }
 
   return (
     <div className="panel">
@@ -77,6 +89,9 @@ export default function SupplierTable() {
           </button>
         </div>
       </div>
+
+      <p className="table-hint">행을 클릭하면 '24 / '25년 재무·평가 상세를 볼 수 있습니다.</p>
+
       <div className="supplier-table-scroll">
         <table>
           <thead>
@@ -90,16 +105,16 @@ export default function SupplierTable() {
               <th>매출액 성장률</th>
               <th>종합점수</th>
               <th>최종등급</th>
-              <th>비고</th>
+              <th>공시정보</th>
             </tr>
           </thead>
           <tbody>
             {filtered.map((s) => (
-              <tr key={s.id}>
+              <tr key={s.id} className="clickable-row" onClick={() => setSelected(s)}>
                 <td>{s.name}</td>
                 <td>{s.category ?? "-"}</td>
                 <td>{s.manager ?? "-"}</td>
-                <td>{fmtAmount(s.contractAmount25)}</td>
+                <td>{fmtWon(s.contractAmount25)}</td>
                 <td>{fmtPct(s.debtRatio)}</td>
                 <td>{fmtPct(s.operatingMargin)}</td>
                 <td>{fmtPct(s.revenueGrowth)}</td>
@@ -108,12 +123,25 @@ export default function SupplierTable() {
                   <RiskBadge risk={gradeToRisk(s.grade)} />
                   <span className="grade-text">{s.grade}</span>
                 </td>
-                <td>{s.note ?? "-"}</td>
+                <td>{disclosureCell(s.id)}</td>
               </tr>
             ))}
           </tbody>
         </table>
       </div>
+
+      {selected && (
+        <SupplierDetailModal
+          supplier={selected}
+          disclosure={
+            disclosures.configured && disclosures.ok
+              ? disclosures.bySupplierId[selected.id]
+              : undefined
+          }
+          dartConfigured={dartConfigured}
+          onClose={() => setSelected(null)}
+        />
+      )}
     </div>
   );
 }

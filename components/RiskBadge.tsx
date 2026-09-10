@@ -1,4 +1,4 @@
-import { RiskLevel } from "@/lib/data";
+import type { RiskLevel } from "@/lib/data";
 
 export default function RiskBadge({ risk }: { risk: RiskLevel }) {
   const cls =
