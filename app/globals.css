@@ -276,6 +276,96 @@ h1 {
   letter-spacing: -0.025em;
 }
 
+.metric-card-clickable {
+  display: block;
+  width: 100%;
+  text-align: left;
+  font-family: inherit;
+  color: inherit;
+  cursor: pointer;
+  appearance: none;
+  -webkit-appearance: none;
+}
+
+.metric-card-hint {
+  margin-top: 8px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--accent);
+  opacity: 0;
+  transition: opacity 0.15s ease;
+}
+
+.metric-card-clickable:hover .metric-card-hint,
+.metric-card-clickable:focus-visible .metric-card-hint {
+  opacity: 1;
+}
+
+.metric-modal-card {
+  max-width: 560px;
+}
+
+.metric-modal-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.metric-modal-list li {
+  padding: 12px 4px;
+  border-bottom: 1px solid var(--border);
+}
+
+.metric-modal-list li:last-child {
+  border-bottom: none;
+}
+
+.metric-modal-primary {
+  font-weight: 700;
+  font-size: 14.5px;
+  color: var(--text);
+}
+
+.metric-modal-row {
+  margin-top: 4px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.metric-modal-secondary {
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+.metric-modal-tag {
+  font-size: 12px;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+.metric-modal-tag-danger {
+  background: rgba(216, 58, 63, 0.12);
+  color: var(--danger);
+}
+
+.metric-modal-tag-warn {
+  background: rgba(177, 115, 10, 0.14);
+  color: var(--mid);
+}
+
+.metric-modal-tag-good {
+  background: rgba(26, 125, 77, 0.12);
+  color: var(--low);
+}
+
 /* ── 패널 / 테이블 ─────────────────────────────── */
 .panel {
   background: var(--card);

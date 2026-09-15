@@ -1,9 +1,10 @@
-import MetricCard from "@/components/MetricCard";
 import SupplierTable from "@/components/SupplierTable";
+import ClickableMetricCard from "@/components/ClickableMetricCard";
+import type { MetricListItem } from "@/components/ClickableMetricCard";
 import SummaryPanel from "@/components/SummaryPanel";
 import BarChart from "@/components/charts/BarChart";
 import DonutChart from "@/components/charts/DonutChart";
-import { suppliers, riskCounts } from "@/lib/suppliers";
+import { suppliers, riskCounts, gradeToRisk } from "@/lib/suppliers";
 import type { SupplierGrade } from "@/lib/suppliers";
 import { fetchSupplierDisclosures } from "@/lib/data";
 import { kstDateTime } from "@/lib/time";
@@ -53,6 +54,30 @@ export default async function SuppliersPage() {
       ? scored.reduce((a, b) => ((b.totalScore ?? Infinity) < (a.totalScore ?? Infinity) ? b : a))
       : null;
 
+  function toItem(s: (typeof suppliers)[number]): MetricListItem {
+    const tier = gradeToRisk(s.grade);
+    return {
+      id: s.id,
+      primary: s.name,
+      secondary: `${s.category ?? "-"} · 담당 ${s.manager ?? "-"} · 종합점수 ${s.totalScore ?? "-"}`,
+      tag: s.grade,
+      tagTone: tier === "상" ? "danger" : tier === "중" ? "warn" : "good",
+    };
+  }
+
+  const allSupplierItems: MetricListItem[] = [...suppliers]
+    .sort((a, b) => (a.totalScore ?? 999) - (b.totalScore ?? 999))
+    .map(toItem);
+  const highRiskSupplierItems: MetricListItem[] = suppliers
+    .filter((s) => gradeToRisk(s.grade) === "상")
+    .map(toItem);
+  const cautionSupplierItems: MetricListItem[] = suppliers
+    .filter((s) => gradeToRisk(s.grade) === "중")
+    .map(toItem);
+  const scoreRankedItems: MetricListItem[] = [...scored]
+    .sort((a, b) => (b.totalScore ?? 0) - (a.totalScore ?? 0))
+    .map(toItem);
+
   const summaryLines = [
     `총 ${suppliers.length}개 공급업체 중 고위험(위험/과락/오류) ${counts["상"]}개 · 유의 등급 ${counts["중"]}개.`,
     `평균 종합점수 ${avgScore.toFixed(1)}점.`,
@@ -75,14 +100,33 @@ export default async function SuppliersPage() {
       <SummaryPanel lines={summaryLines} />
 
       <div className="metric-grid">
-        <MetricCard label="관리 대상 공급업체" value={`${suppliers.length}개`} />
-        <MetricCard
+        <ClickableMetricCard
+          label="관리 대상 공급업체"
+          value={`${suppliers.length}개`}
+          modalTitle="관리 대상 공급업체 목록"
+          modalSubtitle="종합점수 낮은순(고위험 우선) 정렬"
+          items={allSupplierItems}
+        />
+        <ClickableMetricCard
           label="고위험(위험/과락/오류) 업체"
           value={`${counts["상"]}개`}
           tone={counts["상"] > 0 ? "danger" : "default"}
+          modalTitle="고위험(위험/과락/오류) 업체 목록"
+          items={highRiskSupplierItems}
         />
-        <MetricCard label="유의 등급 업체" value={`${counts["중"]}개`} />
-        <MetricCard label="평균 종합점수" value={avgScore.toFixed(1)} />
+        <ClickableMetricCard
+          label="유의 등급 업체"
+          value={`${counts["중"]}개`}
+          modalTitle="유의 등급 업체 목록"
+          items={cautionSupplierItems}
+        />
+        <ClickableMetricCard
+          label="평균 종합점수"
+          value={avgScore.toFixed(1)}
+          modalTitle="종합점수 랭킹"
+          modalSubtitle={`점수 산출 업체 ${scored.length}개 · 높은순 정렬`}
+          items={scoreRankedItems}
+        />
       </div>
 
       <div className="panel">

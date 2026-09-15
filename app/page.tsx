@@ -1,5 +1,6 @@
 import Link from "next/link";
-import MetricCard from "@/components/MetricCard";
+import ClickableMetricCard from "@/components/ClickableMetricCard";
+import type { MetricListItem } from "@/components/ClickableMetricCard";
 import SummaryPanel from "@/components/SummaryPanel";
 import DonutChart from "@/components/charts/DonutChart";
 import BarChart from "@/components/charts/BarChart";
@@ -29,7 +30,7 @@ export default async function DashboardPage() {
     fetchMaterialPrices(),
   ]);
 
-  const recentEvents = [
+  const allRecentEvents = [
     ...news
       .filter((n) => n.publishedTs > 0)
       .map((n) => ({
@@ -46,9 +47,8 @@ export default async function DashboardPage() {
       label: `${l.route} · ${l.status}`,
       risk: l.risk,
     })),
-  ]
-    .sort((a, b) => b.ts - a.ts)
-    .slice(0, 6);
+  ].sort((a, b) => b.ts - a.ts);
+  const recentEvents = allRecentEvents.slice(0, 6);
 
   const topRiskSuppliers = [...suppliers]
     .filter((s) => gradeToRisk(s.grade) !== "하")
@@ -76,6 +76,71 @@ export default async function DashboardPage() {
   const severeLogistics = logistics.filter((l) => l.status === "지연 심각").length;
   const delayedLogistics = logistics.filter((l) => l.status === "지연").length;
 
+  const totalBreakdownItems: MetricListItem[] = [
+    { id: "materials", primary: "원자재 · 반도체 시세", secondary: "실시간 시세 모니터링 품목", tag: `${materials.length}건` },
+    { id: "news", primary: "공급업체 뉴스", secondary: "최근 1년 이내 수집 기사", tag: `${news.length}건` },
+    { id: "logistics", primary: "물류 리드타임 구간", secondary: "권역별 리드타임 모니터링", tag: `${logistics.length}건` },
+    { id: "suppliers", primary: "공급업체", secondary: "AI 평가기준 스코어링 대상", tag: `${suppliers.length}개` },
+  ];
+
+  const highRiskItems: MetricListItem[] = [
+    ...materials
+      .filter((m) => m.risk === "상")
+      .map((m) => ({
+        id: `mat-${m.id}`,
+        primary: shortMaterialName(m.materialName),
+        secondary: `원자재 · 반도체 · 변동률 ${m.changeRate >= 0 ? "+" : ""}${m.changeRate}%`,
+        tag: "리스크 상",
+        tagTone: "danger" as const,
+      })),
+    ...news
+      .filter((n) => n.risk === "상")
+      .map((n) => ({
+        id: `news-${n.id}`,
+        primary: `${n.supplierName} · ${n.headline}`,
+        secondary: "공급업체 뉴스",
+        tag: "리스크 상",
+        tagTone: "danger" as const,
+      })),
+    ...logistics
+      .filter((l) => l.risk === "상")
+      .map((l) => ({
+        id: `log-${l.id}`,
+        primary: `${l.region} · ${l.route}`,
+        secondary: `물류 · ${l.status}`,
+        tag: "리스크 상",
+        tagTone: "danger" as const,
+      })),
+    ...suppliers
+      .filter((s) => gradeToRisk(s.grade) === "상")
+      .map((s) => ({
+        id: `sup-${s.id}`,
+        primary: s.name,
+        secondary: `공급업체 · ${s.category ?? "-"}`,
+        tag: s.grade,
+        tagTone: "danger" as const,
+      })),
+  ];
+
+  const supplierListItems: MetricListItem[] = [...suppliers]
+    .sort((a, b) => (a.totalScore ?? 999) - (b.totalScore ?? 999))
+    .map((s) => ({
+      id: s.id,
+      primary: s.name,
+      secondary: `${s.category ?? "-"} · 담당 ${s.manager ?? "-"} · 종합점수 ${s.totalScore ?? "-"}`,
+      tag: s.grade,
+      tagTone:
+        gradeToRisk(s.grade) === "상" ? "danger" : gradeToRisk(s.grade) === "중" ? "warn" : "good",
+    }));
+
+  const recentUpdateItems: MetricListItem[] = allRecentEvents.map((e) => ({
+    id: e.id,
+    primary: e.label,
+    secondary: e.time,
+    tag: `리스크 ${e.risk}`,
+    tagTone: e.risk === "상" ? "danger" : e.risk === "중" ? "warn" : "good",
+  }));
+
   const summaryLines = [
     `오늘 총 ${summary.totalMonitoredItems}건 모니터링 중, 리스크 [상] ${summary.highRiskCount}건 발생.`,
     `공급업체 ${suppliers.length}개 중 위험 등급 ${counts["상"]}개 · 유의 등급 ${counts["중"]}개.`,
@@ -96,14 +161,35 @@ export default async function DashboardPage() {
       <SummaryPanel lines={summaryLines} />
 
       <div className="metric-grid">
-        <MetricCard label="총 모니터링 항목" value={`${summary.totalMonitoredItems}건`} />
-        <MetricCard
+        <ClickableMetricCard
+          label="총 모니터링 항목"
+          value={`${summary.totalMonitoredItems}건`}
+          modalTitle="총 모니터링 항목 구성"
+          modalSubtitle="카테고리별 모니터링 대상 건수"
+          items={totalBreakdownItems}
+        />
+        <ClickableMetricCard
           label="리스크 [상] 발생"
           value={`${summary.highRiskCount}건`}
           tone={summary.highRiskCount > 0 ? "danger" : "default"}
+          modalTitle="리스크 [상] 발생 항목"
+          modalSubtitle="원자재 · 공급업체 뉴스 · 물류 · 공급업체 평가 전체 기준"
+          items={highRiskItems}
         />
-        <MetricCard label="관리 대상 공급업체" value={`${summary.activeSuppliers}개`} />
-        <MetricCard label="최근 24시간 업데이트" value={`${summary.recentlyUpdated}건`} />
+        <ClickableMetricCard
+          label="관리 대상 공급업체"
+          value={`${summary.activeSuppliers}개`}
+          modalTitle="관리 대상 공급업체 목록"
+          modalSubtitle="종합점수 낮은순(고위험 우선) 정렬"
+          items={supplierListItems}
+        />
+        <ClickableMetricCard
+          label="최근 24시간 업데이트"
+          value={`${summary.recentlyUpdated}건`}
+          modalTitle="최근 업데이트 항목"
+          modalSubtitle="공급업체 뉴스 + 물류 구간 업데이트"
+          items={recentUpdateItems}
+        />
       </div>
 
       <div className="panel">
