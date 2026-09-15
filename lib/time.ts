@@ -52,3 +52,20 @@ export function kstTodayEightAM(): Date {
   const p = kstParts(now);
   return new Date(`${p.year}-${p.month}-${p.day}T08:00:00+09:00`);
 }
+
+/** "08:00" — 시:분만. */
+export function kstTime(date: Date): string {
+  if (Number.isNaN(date.getTime())) return "-";
+  const p = kstParts(date);
+  return `${p.hour}:${p.minute}`;
+}
+
+/** "9월 15일(화)" — 네비게이션 상단 오늘 날짜 표기용. */
+export function kstDateShort(date: Date): string {
+  if (Number.isNaN(date.getTime())) return "-";
+  const p = kstParts(date);
+  const weekday = new Intl.DateTimeFormat("ko-KR", { timeZone: KST, weekday: "short" }).format(
+    date
+  );
+  return `${Number(p.month)}월 ${Number(p.day)}일(${weekday})`;
+}

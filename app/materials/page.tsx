@@ -1,7 +1,13 @@
 import RiskBadge from "@/components/RiskBadge";
 import BarChart from "@/components/charts/BarChart";
 import LineChart from "@/components/charts/LineChart";
-import { fetchMaterialPrices, fetchExchangeRates, fetchCommodityNews } from "@/lib/data";
+import {
+  fetchMaterialPrices,
+  fetchSemiconductorPrices,
+  fetchExchangeRates,
+  fetchCommodityNews,
+} from "@/lib/data";
+import type { MaterialPrice } from "@/lib/data";
 import { kstDateTime } from "@/lib/time";
 
 /** 표시용 짧은 품목명: 괄호 안 설명 제거 (예: "구리 (Copper)" -> "구리") */
@@ -13,9 +19,57 @@ function shortMaterialName(name: string): string {
 // 하루 캐시 + 매일 08:00(KST) /api/cron/refresh 가 캐시를 무효화합니다.
 export const revalidate = 86400;
 
+function MaterialsTable({ items }: { items: MaterialPrice[] }) {
+  return (
+    <div className="table-scroll">
+      <table>
+        <thead>
+          <tr>
+            <th>품목</th>
+            <th>현재가</th>
+            <th>변동률</th>
+            <th>기준시각(KST)</th>
+            <th>출처</th>
+            <th>리스크</th>
+          </tr>
+        </thead>
+        <tbody>
+          {items.map((m) => (
+            <tr key={m.id}>
+              <td>
+                {m.materialName}
+                {m.note && <span className="grade-text">{m.note}</span>}
+              </td>
+              <td>
+                {m.live ? (
+                  <>
+                    {m.currentPrice.toLocaleString(undefined, { maximumFractionDigits: 2 })}{" "}
+                    {m.unit}
+                  </>
+                ) : (
+                  "-"
+                )}
+              </td>
+              <td className={m.changeRate >= 0 ? "change-up" : "change-down"}>
+                {m.live ? `${m.changeRate >= 0 ? "+" : ""}${m.changeRate}%` : "-"}
+              </td>
+              <td>{m.live && m.marketTime ? kstDateTime(new Date(m.marketTime * 1000)) : "-"}</td>
+              <td>{m.source}</td>
+              <td>
+                <RiskBadge risk={m.risk} />
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
 export default async function MaterialsPage() {
-  const [materials, fx, news] = await Promise.all([
+  const [materials, chips, fx, news] = await Promise.all([
     fetchMaterialPrices(),
+    fetchSemiconductorPrices(),
     fetchExchangeRates(),
     fetchCommodityNews(),
   ]);
@@ -23,7 +77,7 @@ export default async function MaterialsPage() {
   // 이 페이지(캐시 스냅샷)가 생성된 시각 = 실시간 소스를 마지막으로 조회한 시각.
   const refreshedAt = kstDateTime(new Date());
 
-  const latestMarketTime = materials
+  const latestMarketTime = [...materials, ...chips]
     .map((m) => m.marketTime ?? 0)
     .reduce((a, b) => Math.max(a, b), 0);
 
@@ -73,77 +127,49 @@ export default async function MaterialsPage() {
             {fx.live ? `ECB 기준일 ${fx.asOf}` : fx.asOf}
           </span>
         </div>
-        <table>
-          <thead>
-            <tr>
-              <th>통화</th>
-              <th>환율</th>
-            </tr>
-          </thead>
-          <tbody>
-            {fx.rates.map((r) => (
-              <tr key={r.currency}>
-                <td>
-                  {r.currency} ({r.currencyName})
-                </td>
-                <td>{r.rate.toLocaleString(undefined, { maximumFractionDigits: 4 })}</td>
+        <div className="table-scroll">
+          <table>
+            <thead>
+              <tr>
+                <th>통화</th>
+                <th>환율</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {fx.rates.map((r) => (
+                <tr key={r.currency}>
+                  <td>
+                    {r.currency} ({r.currencyName})
+                  </td>
+                  <td>{r.rate.toLocaleString(undefined, { maximumFractionDigits: 4 })}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
         {fx.live && (
           <div className="panel-footnote">
-            ECB는 유럽 영업일 기준 하루 한 번(대략 CET 16:00) 고시합니다. 주말·공휴일이나 이른
-            아침에는 기준일이 전 영업일로 표시되는 것이 정상이며, 실제 조회는 위 &ldquo;마지막
-            갱신 시각&rdquo; 기준으로 이뤄집니다.
+            원화(KRW)를 맨 위에 표시합니다. ECB는 유럽 영업일 기준 하루 한 번(대략 CET 16:00)
+            고시합니다. 주말·공휴일이나 이른 아침에는 기준일이 전 영업일로 표시되는 것이 정상이며,
+            실제 조회는 위 &ldquo;마지막 갱신 시각&rdquo; 기준으로 이뤄집니다.
           </div>
         )}
       </div>
 
       <div className="panel">
         <div className="panel-header">주요 원자재/지표 시세</div>
-        <table>
-          <thead>
-            <tr>
-              <th>품목</th>
-              <th>현재가</th>
-              <th>변동률</th>
-              <th>기준시각(KST)</th>
-              <th>출처</th>
-              <th>리스크</th>
-            </tr>
-          </thead>
-          <tbody>
-            {materials.map((m) => (
-              <tr key={m.id}>
-                <td>
-                  {m.materialName}
-                  {m.note && <span className="grade-text">{m.note}</span>}
-                </td>
-                <td>
-                  {m.live ? (
-                    <>
-                      {m.currentPrice.toLocaleString(undefined, { maximumFractionDigits: 2 })}{" "}
-                      {m.unit}
-                    </>
-                  ) : (
-                    "-"
-                  )}
-                </td>
-                <td className={m.changeRate >= 0 ? "change-up" : "change-down"}>
-                  {m.live ? `${m.changeRate >= 0 ? "+" : ""}${m.changeRate}%` : "-"}
-                </td>
-                <td>
-                  {m.live && m.marketTime ? kstDateTime(new Date(m.marketTime * 1000)) : "-"}
-                </td>
-                <td>{m.source}</td>
-                <td>
-                  <RiskBadge risk={m.risk} />
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+        <MaterialsTable items={materials} />
+      </div>
+
+      <div className="panel">
+        <div className="panel-header">메모리(DDR) · 주요 칩셋 가격 추이</div>
+        <MaterialsTable items={chips} />
+        <div className="panel-footnote">
+          DDR4/DDR5/NAND 현물가는 TrendForce·DRAMeXchange 등 유료 구독 소스가 대부분이라 무료
+          공개 API로 직접 연동할 수 없어 아직 미연동입니다(자리만 마련). 대신 삼성전자·SK하이닉스·
+          Micron·TSMC 주가를 메모리/파운드리 관련주 대리 지표로 함께 보여드립니다 — 실제 칩
+          현물가와는 다른 수치입니다.
+        </div>
       </div>
 
       <div className="panel">

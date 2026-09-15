@@ -82,56 +82,60 @@ export default function SupplierDetailModal({
 
           <section className="modal-section">
             <h3>재무 정보 <span className="unit-note">(단위: 억원)</span></h3>
-            <table className="modal-table">
-              <thead>
-                <tr>
-                  <th>항목</th>
-                  <th>'24년</th>
-                  <th>'25년</th>
-                  <th>증감</th>
-                </tr>
-              </thead>
-              <tbody>
-                {FIN_ROWS.map((r) => {
-                  const v24 = supplier.fy24[r.key];
-                  const v25 = supplier.fy25[r.key];
-                  const diff =
-                    v24 !== null && v25 !== null ? v25 - v24 : null;
-                  return (
-                    <tr key={r.key}>
-                      <td>{r.label}</td>
-                      <td>{fmtEok(v24)}</td>
-                      <td>{fmtEok(v25)}</td>
-                      <td className={diff === null ? "" : diff >= 0 ? "change-down" : "change-up"}>
-                        {diff === null ? "-" : `${diff >= 0 ? "+" : ""}${fmtEok(diff)}`}
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+            <div className="table-scroll">
+              <table className="modal-table">
+                <thead>
+                  <tr>
+                    <th>항목</th>
+                    <th>'24년</th>
+                    <th>'25년</th>
+                    <th>증감</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {FIN_ROWS.map((r) => {
+                    const v24 = supplier.fy24[r.key];
+                    const v25 = supplier.fy25[r.key];
+                    const diff =
+                      v24 !== null && v25 !== null ? v25 - v24 : null;
+                    return (
+                      <tr key={r.key}>
+                        <td>{r.label}</td>
+                        <td>{fmtEok(v24)}</td>
+                        <td>{fmtEok(v25)}</td>
+                        <td className={diff === null ? "" : diff >= 0 ? "change-down" : "change-up"}>
+                          {diff === null ? "-" : `${diff >= 0 ? "+" : ""}${fmtEok(diff)}`}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
           </section>
 
           <section className="modal-section">
             <h3>평가 스코어링</h3>
-            <table className="modal-table">
-              <thead>
-                <tr>
-                  <th>지표</th>
-                  <th>값</th>
-                  <th>배점</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr><td>부채비율</td><td>{fmtPct(sc.debtRatio)}</td><td>{fmtNum(sc.debtScore)}</td></tr>
-                <tr><td>부채 변동률</td><td>{fmtPct(sc.debtChangeRatio)}</td><td>{fmtNum(sc.debtChangeScore)}</td></tr>
-                <tr><td>영업이익률</td><td>{fmtPct(sc.operatingMargin)}</td><td>{fmtNum(sc.operatingScore)}</td></tr>
-                <tr><td>매출액 성장률</td><td>{fmtPct(sc.revenueGrowth)}</td><td>{fmtNum(sc.revenueGrowthScore)}</td></tr>
-                <tr><td>매출액 규모</td><td>{fmtEok(sc.revenueAmount)}</td><td>{fmtNum(sc.revenueScore)}</td></tr>
-                <tr><td>현금흐름</td><td>-</td><td>{fmtNum(sc.cashFlowScore)}</td></tr>
-                <tr className="modal-total-row"><td>종합점수</td><td>-</td><td>{fmtNum(sc.totalScore)}</td></tr>
-              </tbody>
-            </table>
+            <div className="table-scroll">
+              <table className="modal-table">
+                <thead>
+                  <tr>
+                    <th>지표</th>
+                    <th>값</th>
+                    <th>배점</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr><td>부채비율</td><td>{fmtPct(sc.debtRatio)}</td><td>{fmtNum(sc.debtScore)}</td></tr>
+                  <tr><td>부채 변동률</td><td>{fmtPct(sc.debtChangeRatio)}</td><td>{fmtNum(sc.debtChangeScore)}</td></tr>
+                  <tr><td>영업이익률</td><td>{fmtPct(sc.operatingMargin)}</td><td>{fmtNum(sc.operatingScore)}</td></tr>
+                  <tr><td>매출액 성장률</td><td>{fmtPct(sc.revenueGrowth)}</td><td>{fmtNum(sc.revenueGrowthScore)}</td></tr>
+                  <tr><td>매출액 규모</td><td>{fmtEok(sc.revenueAmount)}</td><td>{fmtNum(sc.revenueScore)}</td></tr>
+                  <tr><td>현금흐름</td><td>-</td><td>{fmtNum(sc.cashFlowScore)}</td></tr>
+                  <tr className="modal-total-row"><td>종합점수</td><td>-</td><td>{fmtNum(sc.totalScore)}</td></tr>
+                </tbody>
+              </table>
+            </div>
           </section>
 
           {(supplier.note || supplier.finalReview || supplier.remark) && (

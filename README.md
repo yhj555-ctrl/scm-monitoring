@@ -10,10 +10,18 @@ PR팀의 `pr-monitoring-v2` 구조(메인 대시보드 + 소스별 서브 모니
 | `/` | 통합 리스크 대시보드 (총 모니터링 건수, 고위험 건수, 업체평가 리스크 TOP5, 최근 이슈) |
 | `/suppliers` | **업체평가 리스크 관리** — 99개 공급업체 AI 평가 결과. 행 클릭 시 '24/'25년 재무·평가 상세 팝업. "공시정보" 열에서 DART 최근 공시 확인 |
 | `/materials` | **원자재·환율 실시간 모니터링** + 하단에 원자재·환율 관련 최신 뉴스 |
-| `/news` | **공급업체 뉴스 실시간 크롤링** (게재시각 최신순) |
+| `/news` | **공급업체 뉴스 실시간 크롤링** — 업체명이 제목에 실제로 포함되는지 재검증, 최근 1년 이내만 표시, 열 클릭 정렬 |
 | `/logistics` | 물류/리드타임 모니터링 — 대한민국 기준 중국·대만·미국·유럽·국내 구간 (아직 목업) |
+| `/competitors` | **경쟁사 동향** — KT · LG유플러스 · SK텔레콤 장비·서비스 구매/공급업체 관련 뉴스, 통신사별 구분 |
 
 모든 실시간 데이터는 **매일 08:00(KST)** 에 자동 갱신됩니다.
+
+## 상단 네비게이션 — 오늘 날짜·서울 날씨·환율
+
+로그아웃 버튼 왼쪽에 두 줄로 표시됩니다: **① 오늘 날짜 + 서울 날씨(Open-Meteo, 무료·키 불필요)**,
+**② USD/KRW 환율 + 기준 시각**. `app/layout.tsx` 에서 서버 컴포넌트로 조회해 `components/Nav.tsx`
+에 props 로 내려줍니다. 환율은 `/materials` 와 같은 소스(Frankfurter)를 재사용합니다. 다른 페이지와
+동일하게 매일 08:00(KST)에 자동 갱신됩니다. 구현: `lib/live/weather.ts`.
 
 ## 차트 시각화
 
@@ -67,10 +75,14 @@ CSS 변수)와 항상 같은 색을 씁니다. 구현: `components/charts/`, 색
 |---|---|---|
 | 공급업체 뉴스 | Google 뉴스 RSS (무료, 키 불필요) | 내부 평가상 위험·유의 등급 업체(최대 18개) 우선 크롤링, 게재시각 최신순 정렬 |
 | 원자재·환율 뉴스 | Google 뉴스 RSS (무료, 키 불필요) | `/materials` 하단. 구리·알루미늄·니켈·유가·환율·석유화학 주제, 최신순 |
-| 환율 | Frankfurter API `api.frankfurter.dev/v1` (ECB 기준, 무료, 키 불필요) | USD 기준 KRW/JPY/EUR/CNY. 구 도메인 `api.frankfurter.app` 은 이제 여기로 301 리다이렉트됨 |
+| 환율 | Frankfurter API `api.frankfurter.dev/v1` (ECB 기준, 무료, 키 불필요) | USD 기준, **원화(KRW)를 맨 위로 정렬** 후 JPY/EUR/CNY. 구 도메인 `api.frankfurter.app` 은 이제 여기로 301 리다이렉트됨 |
 | 원자재/지표 | Yahoo Finance 비공식 차트 API | 구리·알루미늄·금·WTI원유. **비공식 API라 클라우드(Vercel) IP에서 간헐적으로 차단될 수 있음** |
 | 니켈, PP(폴리프로필렌) | 미연동 | 안정적인 무료 공개 API가 없어 자리만 마련해뒀습니다. KOMIS 등에서 키 발급 후 `lib/live/metals.ts`의 `NO_FREE_SOURCE`를 교체하세요 |
+| 메모리·칩셋 관련주 | Yahoo Finance 비공식 차트 API | `/materials` 하단. 삼성전자·SK하이닉스·Micron·TSMC 주가(메모리/파운드리 대리 지표). `lib/live/semiconductors.ts` |
+| DDR4/DDR5/NAND 현물가 | 미연동 | TrendForce·DRAMeXchange 등 유료 구독 소스가 대부분이라 무료 공개 API 없음. 자리만 마련 |
 | 공급업체 공시 | 전자공시시스템 DART OpenAPI | `DART_API_KEY` 필요(무료). `lib/live/dart.ts`. 위 "DART 연동" 참고 |
+| 경쟁사 동향 뉴스 | Google 뉴스 RSS (무료, 키 불필요) | `/competitors`. KT·LG유플러스·SK텔레콤 장비/구매/공급업체 키워드, 통신사별 구분·최신순 |
+| 서울 날씨 | Open-Meteo (무료, 키 불필요) | 상단 네비게이션. `lib/live/weather.ts` |
 
 모든 실시간 호출은 실패해도 페이지가 깨지지 않도록 `try/catch` + 폴백 처리되어 있습니다
 (`lib/live/fetchUtils.ts`). 실패 시 "-" 또는 예시값이 표시되고, 다음 정기 갱신 때 재시도합니다.
@@ -79,8 +91,9 @@ CSS 변수)와 항상 같은 색을 씁니다. 구현: `components/charts/`, 색
 
 각 실시간 데이터는 하루(86400초) Next.js 캐시를 갖고 있고, `vercel.json`에 등록된 **Vercel Cron**이
 매일 UTC 23:00(=KST 08:00)에 `/api/cron/refresh`를 호출해 캐시 태그(`supplier-news`,
-`commodity-news`, `fx-rates`, `metal-prices`, `logistics`, `dart-disclosures`)를 강제로
-무효화합니다. 다음 접속 시 새 데이터로 다시 만들어집니다.
+`commodity-news`, `competitor-news`, `fx-rates`, `metal-prices`, `semiconductor-prices`,
+`logistics`, `dart-disclosures`, `weather`)를 강제로 무효화합니다. 다음 접속 시 새 데이터로
+다시 만들어집니다.
 
 각 페이지 상단의 **"마지막 갱신 시각(KST)"** 이 이 캐시 스냅샷이 만들어진 시각입니다.
 환율의 "ECB 기준일" 은 유럽중앙은행 고시일이라 주말·공휴일·이른 아침에는 전 영업일로 보이는

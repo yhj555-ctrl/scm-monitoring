@@ -1,5 +1,6 @@
 import type { RiskLevel, LogisticsRegion } from "./data";
 import type { SupplierGrade } from "./suppliers";
+import type { CompetitorCompany } from "./live/news";
 
 /**
  * 차트 색상 팔레트. `app/globals.css` 의 CSS 변수를 그대로 참조해
@@ -38,4 +39,10 @@ export const REGION_COLOR: Record<LogisticsRegion, string> = {
   미국: "var(--grade-excellent)",
   유럽: "var(--chart-region-eu)",
   대한민국: "var(--chart-region-kr)",
+};
+
+export const COMPETITOR_COLOR: Record<CompetitorCompany, string> = {
+  KT: "var(--accent)",
+  "LG유플러스": "var(--accent-2)",
+  "SK텔레콤": "var(--chart-region-eu)",
 };

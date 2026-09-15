@@ -21,6 +21,17 @@ const CURRENCY_NAMES: Record<string, string> = {
   GBP: "파운드",
 };
 
+// 구매팀 관점에서 원화를 최우선으로 노출합니다. 목록에 없는 통화는 뒤에 순서대로 붙습니다.
+const CURRENCY_DISPLAY_ORDER = ["KRW", "JPY", "EUR", "CNY"];
+
+function byDisplayOrder(a: FxRate, b: FxRate): number {
+  const ai = CURRENCY_DISPLAY_ORDER.indexOf(a.currency);
+  const bi = CURRENCY_DISPLAY_ORDER.indexOf(b.currency);
+  const aRank = ai === -1 ? CURRENCY_DISPLAY_ORDER.length : ai;
+  const bRank = bi === -1 ? CURRENCY_DISPLAY_ORDER.length : bi;
+  return aRank - bRank;
+}
+
 const FALLBACK_RATES: FxRate[] = [
   { currency: "KRW", currencyName: "원화", rate: 1390 },
   { currency: "JPY", currencyName: "엔화", rate: 149.5 },
@@ -49,11 +60,13 @@ export async function fetchLiveExchangeRates(): Promise<{ rates: FxRate[]; asOf:
     return { rates: FALLBACK_RATES, asOf: "실시간 조회 실패 - 예시값", live: false };
   }
 
-  const rates: FxRate[] = Object.entries(data.rates).map(([currency, rate]) => ({
-    currency,
-    currencyName: CURRENCY_NAMES[currency] ?? currency,
-    rate,
-  }));
+  const rates: FxRate[] = Object.entries(data.rates)
+    .map(([currency, rate]) => ({
+      currency,
+      currencyName: CURRENCY_NAMES[currency] ?? currency,
+      rate,
+    }))
+    .sort(byDisplayOrder);
 
   return { rates, asOf: data.date, live: true };
 }

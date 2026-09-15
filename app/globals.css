@@ -46,11 +46,17 @@
 html {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  /* 모바일에서 개별 요소가 뷰포트보다 넓어져도(표·차트 등) 페이지 전체가 가로로
+     밀리지 않도록 하는 안전장치. 표·차트는 각자 자체 overflow-x:auto 로 스크롤됩니다. */
+  overflow-x: hidden;
+  width: 100%;
 }
 
 body {
   margin: 0;
   min-height: 100vh;
+  overflow-x: hidden;
+  width: 100%;
   background: var(--bg);
   background-image:
     radial-gradient(1100px 620px at 6% -14%, rgba(59, 122, 245, 0.22), transparent 60%),
@@ -138,8 +144,33 @@ a {
   background: var(--accent-soft);
 }
 
-.nav-logout {
+/* 날짜·날씨·환율 요약 (로그아웃 버튼 왼쪽). margin-left:auto 로 뒤 요소(로그아웃)와
+   함께 데스크톱에서 우측 끝으로 밀립니다. */
+.nav-info {
   margin-left: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+.nav-info-line {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
+}
+
+.nav-info-line .dot::before {
+  content: "·";
+  margin-right: 6px;
+  color: var(--text-dim);
+}
+
+.nav-logout {
   border: 1px solid var(--border-strong);
   border-radius: 10px;
   padding: 9px 17px;
@@ -267,6 +298,13 @@ h1 {
   background: linear-gradient(180deg, #f5f9ff, transparent);
 }
 
+/* 표가 화면보다 넓어지면(컬럼이 많은 표) 페이지 전체가 아니라 표 자신만 가로로
+   스크롤되도록 감싸는 래퍼. 모바일에서 표가 잘리거나 레이아웃이 깨지는 것을 막습니다. */
+.table-scroll {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
 table {
   width: 100%;
   border-collapse: collapse;
@@ -290,6 +328,23 @@ th {
   position: sticky;
   top: 0;
   z-index: 1;
+}
+
+.sortable-th {
+  cursor: pointer;
+  user-select: none;
+  transition: color 0.12s ease;
+}
+
+.sortable-th:hover {
+  color: var(--accent);
+}
+
+.sort-arrow {
+  display: inline-block;
+  margin-left: 2px;
+  color: var(--accent);
+  font-size: 10px;
 }
 
 tbody tr {
@@ -483,6 +538,8 @@ tr:last-child td {
 .supplier-table-scroll {
   max-height: 600px;
   overflow-y: auto;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
 }
 
 .grade-text {
@@ -819,6 +876,13 @@ tr:last-child td {
   gap: 28px;
 }
 
+/* 그리드 항목 기본 최소너비(auto)는 내부 콘텐츠(고정폭 SVG 차트) 크기를 그대로
+   따라가 모바일에서 그리드 전체가 밀려버립니다. 0으로 풀어주고, 각 차트 내부의
+   .chart-scroll 이 필요할 때 자기 자신만 가로 스크롤되게 합니다. */
+.chart-row > * {
+  min-width: 0;
+}
+
 .chart-subtitle {
   font-size: 13.5px;
   font-weight: 700;
@@ -957,10 +1021,45 @@ tr:last-child td {
   .modal-header {
     padding: 18px 16px;
   }
+
+  /* 로고 + 로그아웃을 한 줄에, 메뉴는 그 아래 한 줄로 내려 가로 스와이프하게 합니다.
+     (전 항목이 한 줄에 다 안 들어가 페이지 전체가 옆으로 밀리던 문제 수정) */
   .nav {
-    gap: 12px;
-    padding: 13px 16px;
+    flex-wrap: wrap;
+    row-gap: 10px;
+    gap: 10px 12px;
+    padding: 12px 16px;
   }
+  .nav-title {
+    order: 1;
+  }
+  .nav-logout {
+    order: 2;
+    margin-left: auto;
+  }
+  .nav-info {
+    order: 3;
+    flex: 1 1 100%;
+    flex-direction: row;
+    flex-wrap: wrap;
+    gap: 4px 14px;
+    white-space: normal;
+  }
+  .nav-info-line {
+    justify-content: flex-start;
+  }
+  .nav-links {
+    order: 4;
+    flex: 1 1 100%;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    gap: 6px;
+  }
+  .nav-link {
+    flex-shrink: 0;
+  }
+
   .main {
     padding: 30px 16px 68px;
   }
@@ -970,5 +1069,8 @@ tr:last-child td {
   th,
   td {
     padding: 12px 15px;
+  }
+  .chart-row {
+    gap: 22px;
   }
 }

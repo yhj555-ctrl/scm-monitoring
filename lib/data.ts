@@ -1,12 +1,16 @@
 import { unstable_cache } from "next/cache";
 import { suppliers, gradeToRisk } from "./suppliers";
-import { fetchLiveSupplierNews, fetchLiveCommodityNews } from "./live/news";
-import type { CommodityNewsItem } from "./live/news";
+import { fetchLiveSupplierNews, fetchLiveCommodityNews, fetchLiveCompetitorNews } from "./live/news";
+import type { CommodityNewsItem, CompetitorNewsItem } from "./live/news";
 import { fetchLiveExchangeRates } from "./live/fx";
 import type { FxRate } from "./live/fx";
 import { fetchLiveMetalPrices } from "./live/metals";
+import type { LiveMaterialPrice } from "./live/metals";
+import { fetchLiveSemiconductorPrices } from "./live/semiconductors";
 import { fetchDartDisclosures } from "./live/dart";
 import type { DartResult } from "./live/dart";
+import { fetchSeoulWeather as fetchLiveSeoulWeather } from "./live/weather";
+import type { SeoulWeather } from "./live/weather";
 import { kstDate, kstTodayEightAM } from "./time";
 
 export type RiskLevel = "상" | "중" | "하";
@@ -62,10 +66,22 @@ export interface DashboardSummary {
 
 export type { CommodityNewsItem };
 export type { DartResult, DartSupplierDisclosure, DartFiling } from "./live/dart";
+export type { CompetitorNewsItem, CompetitorCompany } from "./live/news";
+export type { SeoulWeather };
 
 /** 전자공시시스템(DART) 최근 공시 현황 (DART_API_KEY 설정 시). 매일 08:00(KST) 갱신. */
 export async function fetchSupplierDisclosures(): Promise<DartResult> {
   return fetchDartDisclosures();
+}
+
+/** 서울 현재 날씨 (상단 네비게이션). 매일 08:00(KST) 갱신. */
+export async function fetchSeoulWeather(): Promise<SeoulWeather> {
+  return fetchLiveSeoulWeather();
+}
+
+/** 경쟁사(KT/LG유플러스/SK텔레콤) 장비·구매·공급업체 관련 최신 뉴스 (최신순). */
+export async function fetchCompetitorNews(): Promise<CompetitorNewsItem[]> {
+  return fetchLiveCompetitorNews();
 }
 
 /**
@@ -88,9 +104,8 @@ function materialRisk(m: { live: boolean; changeRate: number }): RiskLevel {
   return "하";
 }
 
-export async function fetchMaterialPrices(): Promise<MaterialPrice[]> {
-  const live = await fetchLiveMetalPrices();
-  return live.map((m) => ({
+function toMaterialPrice(m: LiveMaterialPrice): MaterialPrice {
+  return {
     id: m.id,
     materialName: m.materialName,
     unit: m.unit,
@@ -101,7 +116,22 @@ export async function fetchMaterialPrices(): Promise<MaterialPrice[]> {
     live: m.live,
     note: m.note,
     marketTime: m.marketTime,
-  }));
+  };
+}
+
+export async function fetchMaterialPrices(): Promise<MaterialPrice[]> {
+  const live = await fetchLiveMetalPrices();
+  return live.map(toMaterialPrice);
+}
+
+/**
+ * 메모리(DDR)·주요 칩셋 관련 지표. DRAM/NAND 현물가는 무료 API가 없어
+ * 삼성전자·SK하이닉스·Micron·TSMC 주가를 관련 대리 지표로 보여줍니다.
+ * (lib/live/semiconductors.ts 참고)
+ */
+export async function fetchSemiconductorPrices(): Promise<MaterialPrice[]> {
+  const live = await fetchLiveSemiconductorPrices();
+  return live.map(toMaterialPrice);
 }
 
 export async function fetchExchangeRates(): Promise<{ rates: FxRate[]; asOf: string; live: boolean }> {

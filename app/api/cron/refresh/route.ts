@@ -13,10 +13,13 @@ import { revalidateTag } from "next/cache";
 const TAGS = [
   "supplier-news",
   "commodity-news",
+  "competitor-news",
   "fx-rates",
   "metal-prices",
+  "semiconductor-prices",
   "logistics",
   "dart-disclosures",
+  "weather",
 ];
 
 export async function GET(request: NextRequest) {

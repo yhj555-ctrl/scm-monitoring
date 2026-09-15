@@ -9,9 +9,19 @@ const links = [
   { href: "/materials", label: "원자재·환율" },
   { href: "/news", label: "공급업체 뉴스" },
   { href: "/logistics", label: "물류 리드타임" },
+  { href: "/competitors", label: "경쟁사 동향" },
 ];
 
-export default function Nav() {
+export interface NavInfo {
+  todayLabel: string; // "9월 15일(화)"
+  weatherIcon: string;
+  weatherDescription: string;
+  weatherTempC: number | null;
+  usdKrw: number | null;
+  asOfTime: string; // "08:00"
+}
+
+export default function Nav({ info }: { info: NavInfo }) {
   const pathname = usePathname();
   const router = useRouter();
 
@@ -34,6 +44,24 @@ export default function Nav() {
           </Link>
         ))}
       </nav>
+      <div className="nav-info">
+        <div className="nav-info-line">
+          <span>{info.todayLabel}</span>
+          <span className="dot">
+            {info.weatherIcon} 서울 {info.weatherDescription}
+            {info.weatherTempC !== null ? ` ${info.weatherTempC}°C` : ""}
+          </span>
+        </div>
+        <div className="nav-info-line">
+          <span>
+            USD{" "}
+            {info.usdKrw !== null
+              ? `${info.usdKrw.toLocaleString("ko-KR", { maximumFractionDigits: 2 })}원`
+              : "-"}
+          </span>
+          <span className="dot">{info.asOfTime} 기준</span>
+        </div>
+      </div>
       <button type="button" className="nav-logout" onClick={handleLogout}>
         로그아웃
       </button>
