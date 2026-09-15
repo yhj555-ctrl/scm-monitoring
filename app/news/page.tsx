@@ -28,7 +28,7 @@ export default async function NewsPage() {
   news.forEach((n) => {
     supplierCountMap.set(n.supplierName, (supplierCountMap.get(n.supplierName) ?? 0) + 1);
   });
-  const topSupplier = [...supplierCountMap.entries()].sort((a, b) => b[1] - a[1])[0];
+  const topSupplier = Array.from(supplierCountMap.entries()).sort((a, b) => b[1] - a[1])[0];
   const latest = [...news]
     .filter((n) => n.publishedTs > 0)
     .sort((a, b) => b.publishedTs - a.publishedTs)[0];
