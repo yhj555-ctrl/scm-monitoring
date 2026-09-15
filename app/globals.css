@@ -347,6 +347,43 @@ th {
   font-size: 10px;
 }
 
+/* 표가 아닌 카드형 리스트(뉴스 등)의 정렬 버튼 바 */
+.list-sort-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 22px;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg-2);
+  font-size: 12.5px;
+  font-weight: 700;
+  color: var(--text-dim);
+  flex-wrap: wrap;
+}
+
+.list-sort-btn {
+  border: 1px solid var(--border-strong);
+  border-radius: 999px;
+  padding: 4px 12px;
+  font-size: 12.5px;
+  font-weight: 600;
+  background: var(--card);
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.list-sort-btn:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.list-sort-btn.active {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
 tbody tr {
   transition: background 0.12s ease;
 }

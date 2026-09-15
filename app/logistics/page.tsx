@@ -1,4 +1,4 @@
-import RiskBadge from "@/components/RiskBadge";
+import LogisticsTable from "@/components/LogisticsTable";
 import GroupedBarChart from "@/components/charts/GroupedBarChart";
 import DonutChart from "@/components/charts/DonutChart";
 import { fetchLogisticsStatus } from "@/lib/data";
@@ -77,47 +77,10 @@ export default async function LogisticsPage() {
         <div className="panel" key={g.region}>
           <div className="panel-header">
             <span className="region-dot" style={{ background: REGION_COLOR[g.region] }} />
-            {g.region === "대한민국" ? "대한민국 국내" : `${g.region} ↔ 대한민국`} 구간
+            {g.region === "대한민국" ? "대한민국 국내" : `${g.region} ↔ 대한민국`} 구간 (열 클릭
+            시 정렬)
           </div>
-          <div className="table-scroll">
-            <table>
-              <thead>
-                <tr>
-                  <th>구간</th>
-                  <th>방향</th>
-                  <th>운송사</th>
-                  <th>모드</th>
-                  <th>현재 리드타임</th>
-                  <th>평시</th>
-                  <th>평시 대비</th>
-                  <th>상태</th>
-                  <th>리스크</th>
-                </tr>
-              </thead>
-              <tbody>
-                {g.rows.map((l) => (
-                  <tr key={l.id}>
-                    <td>
-                      {l.route}
-                      {l.note && <span className="grade-text">{l.note}</span>}
-                    </td>
-                    <td>{l.lane}</td>
-                    <td>{l.carrier}</td>
-                    <td>{l.mode}</td>
-                    <td>{l.leadTimeDays}일</td>
-                    <td>{l.baselineDays}일</td>
-                    <td className={l.delayDays > 0 ? "change-up" : "change-down"}>
-                      {l.delayDays > 0 ? `+${l.delayDays}일` : "정상"}
-                    </td>
-                    <td>{l.status}</td>
-                    <td>
-                      <RiskBadge risk={l.risk} />
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          <LogisticsTable rows={g.rows} />
         </div>
       ))}
 

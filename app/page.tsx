@@ -1,8 +1,12 @@
 import Link from "next/link";
 import MetricCard from "@/components/MetricCard";
-import RiskBadge from "@/components/RiskBadge";
 import DonutChart from "@/components/charts/DonutChart";
 import BarChart from "@/components/charts/BarChart";
+import {
+  TopRiskSuppliersTable,
+  RecentEventsTable,
+  MaterialsSummaryTable,
+} from "@/components/dashboard/DashboardTables";
 import {
   fetchDashboardSummary,
   fetchSupplierNews,
@@ -101,58 +105,12 @@ export default async function DashboardPage() {
             전체 {suppliers.length}개 보기 →
           </Link>
         </div>
-        <div className="table-scroll">
-          <table>
-            <thead>
-              <tr>
-                <th>업체명</th>
-                <th>유형</th>
-                <th>종합점수</th>
-                <th>최종등급</th>
-                <th>리스크</th>
-              </tr>
-            </thead>
-            <tbody>
-              {topRiskSuppliers.map((s) => (
-                <tr key={s.id}>
-                  <td>{s.name}</td>
-                  <td>{s.category ?? "-"}</td>
-                  <td>{s.totalScore ?? "-"}</td>
-                  <td>{s.grade}</td>
-                  <td>
-                    <RiskBadge risk={gradeToRisk(s.grade)} />
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+        <TopRiskSuppliersTable suppliers={topRiskSuppliers} />
       </div>
 
       <div className="panel">
-        <div className="panel-header">최근 수집 이슈</div>
-        <div className="table-scroll">
-          <table>
-            <thead>
-              <tr>
-                <th>시각(KST)</th>
-                <th>내용</th>
-                <th>리스크</th>
-              </tr>
-            </thead>
-            <tbody>
-              {recentEvents.map((e) => (
-                <tr key={e.id}>
-                  <td>{e.time}</td>
-                  <td>{e.label}</td>
-                  <td>
-                    <RiskBadge risk={e.risk} />
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+        <div className="panel-header">최근 수집 이슈 (열 클릭 시 정렬)</div>
+        <RecentEventsTable events={recentEvents} />
       </div>
 
       <div className="panel">
@@ -162,36 +120,7 @@ export default async function DashboardPage() {
             원자재 · 환율 전체 →
           </Link>
         </div>
-        <div className="table-scroll">
-          <table>
-            <thead>
-              <tr>
-                <th>품목</th>
-                <th>현재가</th>
-                <th>변동률</th>
-                <th>리스크</th>
-              </tr>
-            </thead>
-            <tbody>
-              {materials.map((m) => (
-                <tr key={m.id}>
-                  <td>{m.materialName}</td>
-                  <td>
-                    {m.live
-                      ? `${m.currentPrice.toLocaleString(undefined, { maximumFractionDigits: 2 })} ${m.unit}`
-                      : "-"}
-                  </td>
-                  <td className={m.changeRate >= 0 ? "change-up" : "change-down"}>
-                    {m.live ? `${m.changeRate >= 0 ? "+" : ""}${m.changeRate}%` : "-"}
-                  </td>
-                  <td>
-                    <RiskBadge risk={m.risk} />
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+        <MaterialsSummaryTable materials={materials} />
       </div>
     </>
   );

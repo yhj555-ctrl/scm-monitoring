@@ -1,4 +1,5 @@
 import BarChart from "@/components/charts/BarChart";
+import SortableNewsList from "@/components/SortableNewsList";
 import { fetchCompetitorNews } from "@/lib/data";
 import type { CompetitorCompany } from "@/lib/data";
 import { kstDateTime } from "@/lib/time";
@@ -48,32 +49,7 @@ export default async function CompetitorsPage() {
               <span className="region-dot" style={{ background: COMPETITOR_COLOR[c.key] }} />
               {c.label} 동향 ({items.length}건)
             </div>
-            {items.length === 0 ? (
-              <div className="panel-footnote">
-                현재 수집된 뉴스가 없습니다. 다음 갱신(매일 08:00 KST) 때 다시 시도합니다.
-              </div>
-            ) : (
-              <ul className="news-list">
-                {items.map((n) => (
-                  <li key={n.id}>
-                    <a
-                      href={n.link}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="news-headline"
-                    >
-                      {n.title}
-                    </a>
-                    <div className="news-meta">
-                      <span>{n.source}</span>
-                      <span className="dot">
-                        {n.publishedAt ? kstDateTime(new Date(n.publishedAt)) : "게재시각 미상"}
-                      </span>
-                    </div>
-                  </li>
-                ))}
-              </ul>
-            )}
+            <SortableNewsList items={items} metaLabel={(n) => n.company} />
           </div>
         );
       })}

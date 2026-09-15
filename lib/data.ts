@@ -68,6 +68,7 @@ export type { CommodityNewsItem };
 export type { DartResult, DartSupplierDisclosure, DartFiling } from "./live/dart";
 export type { CompetitorNewsItem, CompetitorCompany } from "./live/news";
 export type { SeoulWeather };
+export type { FxRate };
 
 /** 전자공시시스템(DART) 최근 공시 현황 (DART_API_KEY 설정 시). 매일 08:00(KST) 갱신. */
 export async function fetchSupplierDisclosures(): Promise<DartResult> {
