@@ -20,11 +20,13 @@ export interface SortableNewsItem {
  */
 export default function SortableNewsList<T extends SortableNewsItem>({
   items,
-  metaLabel,
+  metaKey,
   emptyMessage = "현재 수집된 뉴스가 없습니다. 다음 갱신(매일 08:00 KST) 때 다시 시도합니다.",
 }: {
   items: T[];
-  metaLabel: (item: T) => string;
+  /** 뉴스 메타 첫 칸에 보여줄 필드 이름 (예: "topic", "company"). 서버 컴포넌트에서
+   * 클라이언트 컴포넌트로는 함수를 props 로 넘길 수 없어, 함수 대신 필드명 문자열을 받습니다. */
+  metaKey: keyof T;
   emptyMessage?: string;
 }) {
   const columns: SortColumn<T>[] = [
@@ -66,7 +68,7 @@ export default function SortableNewsList<T extends SortableNewsItem>({
               {n.title}
             </a>
             <div className="news-meta">
-              <span>{metaLabel(n)}</span>
+              <span>{String(n[metaKey])}</span>
               <span className="dot">{n.source}</span>
               <span className="dot">
                 {n.publishedAt ? kstDateTime(new Date(n.publishedAt)) : "게재시각 미상"}

@@ -49,7 +49,7 @@ export default async function CompetitorsPage() {
               <span className="region-dot" style={{ background: COMPETITOR_COLOR[c.key] }} />
               {c.label} 동향 ({items.length}건)
             </div>
-            <SortableNewsList items={items} metaLabel={(n) => n.company} />
+            <SortableNewsList items={items} metaKey="company" />
           </div>
         );
       })}

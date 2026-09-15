@@ -109,7 +109,7 @@ export default async function MaterialsPage() {
 
       <div className="panel">
         <div className="panel-header">원자재 · 환율 관련 최신 뉴스</div>
-        <SortableNewsList items={news} metaLabel={(n) => n.topic} />
+        <SortableNewsList items={news} metaKey="topic" />
       </div>
     </>
   );
