@@ -1,5 +1,6 @@
 import Link from "next/link";
 import MetricCard from "@/components/MetricCard";
+import SummaryPanel from "@/components/SummaryPanel";
 import DonutChart from "@/components/charts/DonutChart";
 import BarChart from "@/components/charts/BarChart";
 import {
@@ -15,6 +16,7 @@ import {
 } from "@/lib/data";
 import { suppliers, gradeToRisk, riskCounts } from "@/lib/suppliers";
 import { kstDateTime } from "@/lib/time";
+import { shortMaterialName } from "@/lib/format";
 import { RISK_COLOR, GRADE_COLOR } from "@/lib/chart-colors";
 
 export const revalidate = 86400; // 하루 캐시 + 매일 08:00(KST) /api/cron/refresh 로 강제 갱신
@@ -65,6 +67,24 @@ export default async function DashboardPage() {
     color: GRADE_COLOR[s.grade],
   }));
 
+  const materialsHighRisk = materials.filter((m) => m.risk === "상").length;
+  const liveMaterials = materials.filter((m) => m.live);
+  const topMover =
+    liveMaterials.length > 0
+      ? liveMaterials.reduce((a, b) => (Math.abs(b.changeRate) > Math.abs(a.changeRate) ? b : a))
+      : null;
+  const severeLogistics = logistics.filter((l) => l.status === "지연 심각").length;
+  const delayedLogistics = logistics.filter((l) => l.status === "지연").length;
+
+  const summaryLines = [
+    `오늘 총 ${summary.totalMonitoredItems}건 모니터링 중, 리스크 [상] ${summary.highRiskCount}건 발생.`,
+    `공급업체 ${suppliers.length}개 중 위험 등급 ${counts["상"]}개 · 유의 등급 ${counts["중"]}개.`,
+    topMover
+      ? `원자재 중 ${shortMaterialName(topMover.materialName)}가 ${topMover.changeRate >= 0 ? "+" : ""}${topMover.changeRate}%로 변동폭이 가장 큼 (리스크 상 품목 ${materialsHighRisk}개).`
+      : `원자재 리스크 상 품목 ${materialsHighRisk}개.`,
+    `물류 ${logistics.length}개 구간 중 지연 심각 ${severeLogistics}건 · 지연 ${delayedLogistics}건.`,
+  ];
+
   return (
     <>
       <h1>SCM 리스크 모니터링 대시보드</h1>
@@ -72,6 +92,8 @@ export default async function DashboardPage() {
       <p className="page-meta">
         마지막 갱신 시각(KST): <strong>{kstDateTime(new Date())}</strong> · 매일 08:00(KST) 자동 갱신
       </p>
+
+      <SummaryPanel lines={summaryLines} />
 
       <div className="metric-grid">
         <MetricCard label="총 모니터링 항목" value={`${summary.totalMonitoredItems}건`} />

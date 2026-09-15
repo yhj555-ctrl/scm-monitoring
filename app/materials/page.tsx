@@ -3,6 +3,7 @@ import LineChart from "@/components/charts/LineChart";
 import MaterialsTable from "@/components/MaterialsTable";
 import FxTable from "@/components/FxTable";
 import SortableNewsList from "@/components/SortableNewsList";
+import SummaryPanel from "@/components/SummaryPanel";
 import {
   fetchMaterialPrices,
   fetchSemiconductorPrices,
@@ -10,11 +11,7 @@ import {
   fetchCommodityNews,
 } from "@/lib/data";
 import { kstDateTime } from "@/lib/time";
-
-/** 표시용 짧은 품목명: 괄호 안 설명 제거 (예: "구리 (Copper)" -> "구리") */
-function shortMaterialName(name: string): string {
-  return name.replace(/\s*\([^)]*\)\s*/g, "").trim();
-}
+import { shortMaterialName } from "@/lib/format";
 
 // 외부 실시간 소스(Yahoo Finance, Frankfurter, Google 뉴스)를 호출합니다.
 // 하루 캐시 + 매일 08:00(KST) /api/cron/refresh 가 캐시를 무효화합니다.
@@ -36,6 +33,24 @@ export default async function MaterialsPage() {
     .reduce((a, b) => Math.max(a, b), 0);
 
   const liveMaterials = materials.filter((m) => m.live);
+  const materialsHighRisk = materials.filter((m) => m.risk === "상").length;
+  const topMover =
+    liveMaterials.length > 0
+      ? liveMaterials.reduce((a, b) => (Math.abs(b.changeRate) > Math.abs(a.changeRate) ? b : a))
+      : null;
+  const krw = fx.rates.find((r) => r.currency === "KRW");
+
+  const summaryLines = [
+    topMover
+      ? `${shortMaterialName(topMover.materialName)}가 ${topMover.changeRate >= 0 ? "+" : ""}${topMover.changeRate}%로 변동폭이 가장 큼.`
+      : "원자재 실시간 변동 데이터가 없습니다.",
+    `원자재 · 반도체 관련주 중 리스크 [상] ${materialsHighRisk}개.`,
+    krw
+      ? `원/달러 환율 ${krw.rate.toLocaleString("ko-KR", { maximumFractionDigits: 2 })}원 (${fx.live ? `ECB 기준일 ${fx.asOf}` : fx.asOf}).`
+      : "환율 데이터가 없습니다.",
+    `원자재 · 환율 관련 뉴스 ${news.length}건 수집.`,
+  ];
+
   const changeBarData = liveMaterials.map((m) => ({
     label: shortMaterialName(m.materialName),
     value: m.changeRate,
@@ -59,6 +74,8 @@ export default async function MaterialsPage() {
           <> · 시세 기준: {kstDateTime(new Date(latestMarketTime * 1000))}</>
         )}
       </p>
+
+      <SummaryPanel lines={summaryLines} />
 
       <div className="panel">
         <div className="panel-header">원자재 변동률 시각화</div>

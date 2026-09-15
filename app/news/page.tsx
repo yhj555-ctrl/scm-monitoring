@@ -1,6 +1,7 @@
 import BarChart from "@/components/charts/BarChart";
 import DonutChart from "@/components/charts/DonutChart";
 import NewsTable from "@/components/NewsTable";
+import SummaryPanel from "@/components/SummaryPanel";
 import { fetchSupplierNews } from "@/lib/data";
 import type { RiskLevel } from "@/lib/data";
 import { kstDateTime } from "@/lib/time";
@@ -23,6 +24,26 @@ export default async function NewsPage() {
     color: RISK_COLOR[tier],
   }));
 
+  const supplierCountMap = new Map<string, number>();
+  news.forEach((n) => {
+    supplierCountMap.set(n.supplierName, (supplierCountMap.get(n.supplierName) ?? 0) + 1);
+  });
+  const topSupplier = [...supplierCountMap.entries()].sort((a, b) => b[1] - a[1])[0];
+  const latest = [...news]
+    .filter((n) => n.publishedTs > 0)
+    .sort((a, b) => b.publishedTs - a.publishedTs)[0];
+
+  const summaryLines = [
+    `최근 1년 이내 공급업체 관련 뉴스 총 ${news.length}건 수집 (리스크 [상] ${riskCountMap["상"]}건 · [중] ${riskCountMap["중"]}건).`,
+    topSupplier
+      ? `언급 빈도가 가장 높은 업체: ${topSupplier[0]} (${topSupplier[1]}건).`
+      : "수집된 업체 언급 뉴스가 없습니다.",
+    latest
+      ? `가장 최근 기사: ${latest.supplierName} · ${latest.headline} (${kstDateTime(new Date(latest.publishedTs))}).`
+      : "최근 기사가 없습니다.",
+    `모든 기사는 업체명-제목 일치 재검증 및 1년 이내 게재분만 표시됩니다.`,
+  ];
+
   return (
     <>
       <h1>공급업체 뉴스 모니터링</h1>
@@ -33,6 +54,8 @@ export default async function NewsPage() {
       <p className="page-meta">
         마지막 갱신 시각(KST): <strong>{refreshedAt}</strong> · 매일 08:00(KST) 자동 갱신
       </p>
+
+      <SummaryPanel lines={summaryLines} />
 
       <div className="panel">
         <div className="panel-header">수집 뉴스 리스크 시각화 ({news.length}건)</div>

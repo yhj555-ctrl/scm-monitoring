@@ -1,5 +1,6 @@
 import BarChart from "@/components/charts/BarChart";
 import SortableNewsList from "@/components/SortableNewsList";
+import SummaryPanel from "@/components/SummaryPanel";
 import { fetchCompetitorNews } from "@/lib/data";
 import type { CompetitorCompany } from "@/lib/data";
 import { kstDateTime } from "@/lib/time";
@@ -24,6 +25,22 @@ export default async function CompetitorsPage() {
     color: COMPETITOR_COLOR[c.key],
   }));
 
+  const mostActive = [...countBarData].sort((a, b) => b.value - a.value)[0];
+  const latest = [...news]
+    .filter((n) => n.publishedTs > 0)
+    .sort((a, b) => b.publishedTs - a.publishedTs)[0];
+
+  const summaryLines = [
+    `KT · LG유플러스 · SK텔레콤 관련 뉴스 총 ${news.length}건 수집.`,
+    mostActive
+      ? `보도량이 가장 많은 통신사: ${mostActive.label} (${mostActive.value}건).`
+      : "수집된 뉴스가 없습니다.",
+    latest
+      ? `가장 최근 기사: ${latest.company} · ${latest.title} (${kstDateTime(new Date(latest.publishedAt))}).`
+      : "최근 기사가 없습니다.",
+    `장비·서비스 구매 및 협력사·SCM 관련 키워드로 매일 08:00(KST) 자동 수집됩니다.`,
+  ];
+
   return (
     <>
       <h1>경쟁사 동향</h1>
@@ -33,6 +50,8 @@ export default async function CompetitorsPage() {
       <p className="page-meta">
         마지막 갱신 시각(KST): <strong>{refreshedAt}</strong> · 매일 08:00(KST) 자동 갱신
       </p>
+
+      <SummaryPanel lines={summaryLines} />
 
       <div className="panel">
         <div className="panel-header">통신사별 수집 건수</div>

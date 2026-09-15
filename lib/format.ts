@@ -24,3 +24,13 @@ export function fmtNum(v: number | null | undefined, digits = 2): string {
   if (v === null || v === undefined) return "-";
   return v.toLocaleString("ko-KR", { maximumFractionDigits: digits });
 }
+
+/** 긴 문자열을 "요약 요약…" 형태로 자릅니다. 요약 카드처럼 공간이 좁은 곳에 사용. */
+export function truncate(s: string, max = 42): string {
+  return s.length > max ? `${s.slice(0, max - 1)}…` : s;
+}
+
+/** 표시용 짧은 품목명: 괄호 안 설명 제거 (예: "구리 (Copper)" -> "구리"). */
+export function shortMaterialName(name: string): string {
+  return name.replace(/\s*\([^)]*\)\s*/g, "").trim();
+}

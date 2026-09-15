@@ -1,6 +1,7 @@
 import LogisticsTable from "@/components/LogisticsTable";
 import GroupedBarChart from "@/components/charts/GroupedBarChart";
 import DonutChart from "@/components/charts/DonutChart";
+import SummaryPanel from "@/components/SummaryPanel";
 import { fetchLogisticsStatus } from "@/lib/data";
 import type { LogisticsRegion, LogisticsItem } from "@/lib/data";
 import { kstDateTime } from "@/lib/time";
@@ -42,6 +43,24 @@ export default async function LogisticsPage() {
     color,
   }));
 
+  const severeCount = shipments.filter((s) => s.status === "지연 심각").length;
+  const delayedCount = shipments.filter((s) => s.status === "지연").length;
+  const worst =
+    shipments.length > 0
+      ? shipments.reduce((a, b) => (b.leadTimeDays - b.baselineDays > a.leadTimeDays - a.baselineDays ? b : a))
+      : null;
+  const overallAvgLead = shipments.length > 0 ? avg(shipments, "leadTimeDays") : 0;
+  const overallAvgBaseline = shipments.length > 0 ? avg(shipments, "baselineDays") : 0;
+
+  const summaryLines = [
+    `전체 ${shipments.length}개 구간 중 지연 심각 ${severeCount}건 · 지연 ${delayedCount}건.`,
+    worst
+      ? `지연 폭이 가장 큰 구간: ${worst.region} ${worst.route} (평시 대비 +${(worst.leadTimeDays - worst.baselineDays).toFixed(1)}일, 현재 ${worst.status}).`
+      : "구간별 지연 데이터가 없습니다.",
+    `전체 구간 평균 리드타임 ${overallAvgLead}일 (평시 ${overallAvgBaseline}일).`,
+    `스냅샷 기준일 ${shipments[0]?.updatedAt ?? "-"} · 매일 08:00(KST) 갱신.`,
+  ];
+
   return (
     <>
       <h1>물류 리드타임 모니터링</h1>
@@ -52,6 +71,8 @@ export default async function LogisticsPage() {
         마지막 갱신 시각(KST): <strong>{refreshedAt}</strong> · 스냅샷 기준일{" "}
         {shipments[0]?.updatedAt ?? "-"} · 리드타임은 모두 대한민국 문전 기준
       </p>
+
+      <SummaryPanel lines={summaryLines} />
 
       <div className="panel">
         <div className="panel-header">구간별 리드타임 시각화</div>

@@ -1,5 +1,6 @@
 import MetricCard from "@/components/MetricCard";
 import SupplierTable from "@/components/SupplierTable";
+import SummaryPanel from "@/components/SummaryPanel";
 import BarChart from "@/components/charts/BarChart";
 import DonutChart from "@/components/charts/DonutChart";
 import { suppliers, riskCounts } from "@/lib/suppliers";
@@ -46,6 +47,21 @@ export default async function SuppliersPage() {
     color: RISK_COLOR[tier],
   }));
 
+  const scored = suppliers.filter((s) => s.totalScore !== null);
+  const lowest =
+    scored.length > 0
+      ? scored.reduce((a, b) => ((b.totalScore ?? Infinity) < (a.totalScore ?? Infinity) ? b : a))
+      : null;
+
+  const summaryLines = [
+    `총 ${suppliers.length}개 공급업체 중 고위험(위험/과락/오류) ${counts["상"]}개 · 유의 등급 ${counts["중"]}개.`,
+    `평균 종합점수 ${avgScore.toFixed(1)}점.`,
+    lowest
+      ? `종합점수 최저 업체: ${lowest.name} (${lowest.totalScore}점, ${lowest.grade}).`
+      : "종합점수가 산출된 업체가 없습니다.",
+    dartLine,
+  ];
+
   return (
     <>
       <h1>업체평가 리스크 관리</h1>
@@ -55,6 +71,8 @@ export default async function SuppliersPage() {
       <p className="page-meta">
         마지막 갱신 시각(KST): <strong>{kstDateTime(new Date())}</strong> · {dartLine}
       </p>
+
+      <SummaryPanel lines={summaryLines} />
 
       <div className="metric-grid">
         <MetricCard label="관리 대상 공급업체" value={`${suppliers.length}개`} />
