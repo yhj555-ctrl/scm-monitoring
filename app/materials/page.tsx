@@ -1,6 +1,13 @@
 import RiskBadge from "@/components/RiskBadge";
+import BarChart from "@/components/charts/BarChart";
+import LineChart from "@/components/charts/LineChart";
 import { fetchMaterialPrices, fetchExchangeRates, fetchCommodityNews } from "@/lib/data";
 import { kstDateTime } from "@/lib/time";
+
+/** 표시용 짧은 품목명: 괄호 안 설명 제거 (예: "구리 (Copper)" -> "구리") */
+function shortMaterialName(name: string): string {
+  return name.replace(/\s*\([^)]*\)\s*/g, "").trim();
+}
 
 // 외부 실시간 소스(Yahoo Finance, Frankfurter, Google 뉴스)를 호출합니다.
 // 하루 캐시 + 매일 08:00(KST) /api/cron/refresh 가 캐시를 무효화합니다.
@@ -20,6 +27,18 @@ export default async function MaterialsPage() {
     .map((m) => m.marketTime ?? 0)
     .reduce((a, b) => Math.max(a, b), 0);
 
+  const liveMaterials = materials.filter((m) => m.live);
+  const changeBarData = liveMaterials.map((m) => ({
+    label: shortMaterialName(m.materialName),
+    value: m.changeRate,
+    color: m.changeRate >= 0 ? "var(--danger)" : "var(--accent)",
+  }));
+  const trendSeries = liveMaterials.map((m) => ({
+    label: shortMaterialName(m.materialName),
+    color: m.changeRate >= 0 ? "var(--danger)" : "var(--accent)",
+    points: [0, m.changeRate],
+  }));
+
   return (
     <>
       <h1>원자재 · 환율 모니터링</h1>
@@ -32,6 +51,20 @@ export default async function MaterialsPage() {
           <> · 시세 기준: {kstDateTime(new Date(latestMarketTime * 1000))}</>
         )}
       </p>
+
+      <div className="panel">
+        <div className="panel-header">원자재 변동률 시각화</div>
+        <div className="chart-panel-body chart-row">
+          <div>
+            <div className="chart-subtitle">품목별 전일 대비 변동률</div>
+            <BarChart data={changeBarData} orientation="horizontal" unit="%" />
+          </div>
+          <div>
+            <div className="chart-subtitle">전일 → 현재 변동률 추이</div>
+            <LineChart xLabels={["전일", "현재"]} series={trendSeries} valueFormatter={(v) => `${v}%`} />
+          </div>
+        </div>
+      </div>
 
       <div className="panel">
         <div className="panel-header panel-header-link">

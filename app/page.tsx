@@ -1,14 +1,17 @@
 import Link from "next/link";
 import MetricCard from "@/components/MetricCard";
 import RiskBadge from "@/components/RiskBadge";
+import DonutChart from "@/components/charts/DonutChart";
+import BarChart from "@/components/charts/BarChart";
 import {
   fetchDashboardSummary,
   fetchSupplierNews,
   fetchLogisticsStatus,
   fetchMaterialPrices,
 } from "@/lib/data";
-import { suppliers, gradeToRisk } from "@/lib/suppliers";
+import { suppliers, gradeToRisk, riskCounts } from "@/lib/suppliers";
 import { kstDateTime } from "@/lib/time";
+import { RISK_COLOR, GRADE_COLOR } from "@/lib/chart-colors";
 
 export const revalidate = 86400; // 하루 캐시 + 매일 08:00(KST) /api/cron/refresh 로 강제 갱신
 
@@ -46,6 +49,18 @@ export default async function DashboardPage() {
     .sort((a, b) => (a.totalScore ?? 999) - (b.totalScore ?? 999))
     .slice(0, 5);
 
+  const counts = riskCounts();
+  const riskDonutData = (["상", "중", "하"] as const).map((tier) => ({
+    label: `리스크 ${tier}`,
+    value: counts[tier],
+    color: RISK_COLOR[tier],
+  }));
+  const top5BarData = topRiskSuppliers.map((s) => ({
+    label: s.name,
+    value: s.totalScore ?? 0,
+    color: GRADE_COLOR[s.grade],
+  }));
+
   return (
     <>
       <h1>SCM 리스크 모니터링 대시보드</h1>
@@ -63,6 +78,20 @@ export default async function DashboardPage() {
         />
         <MetricCard label="관리 대상 공급업체" value={`${summary.activeSuppliers}개`} />
         <MetricCard label="최근 24시간 업데이트" value={`${summary.recentlyUpdated}건`} />
+      </div>
+
+      <div className="panel">
+        <div className="panel-header">리스크 한눈에 보기</div>
+        <div className="chart-panel-body chart-row">
+          <div>
+            <div className="chart-subtitle">공급업체 리스크 등급 분포</div>
+            <DonutChart data={riskDonutData} centerLabel="전체 업체" centerValue={`${suppliers.length}개`} />
+          </div>
+          <div>
+            <div className="chart-subtitle">위험·유의 업체 TOP5 종합점수</div>
+            <BarChart data={top5BarData} orientation="horizontal" />
+          </div>
+        </div>
       </div>
 
       <div className="panel">

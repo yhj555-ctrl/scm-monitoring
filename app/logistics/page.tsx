@@ -1,12 +1,25 @@
 import RiskBadge from "@/components/RiskBadge";
+import GroupedBarChart from "@/components/charts/GroupedBarChart";
+import DonutChart from "@/components/charts/DonutChart";
 import { fetchLogisticsStatus } from "@/lib/data";
-import type { LogisticsRegion } from "@/lib/data";
+import type { LogisticsRegion, LogisticsItem } from "@/lib/data";
 import { kstDateTime } from "@/lib/time";
+import { REGION_COLOR } from "@/lib/chart-colors";
 
 // 매일 08:00(KST) 기준 스냅샷. 하루 캐시 + /api/cron/refresh 로 갱신.
 export const revalidate = 86400;
 
 const REGION_ORDER: LogisticsRegion[] = ["중국", "대만", "미국", "유럽", "대한민국"];
+const STATUS_ORDER: { status: LogisticsItem["status"]; color: string }[] = [
+  { status: "정상", color: "var(--low)" },
+  { status: "지연", color: "var(--mid)" },
+  { status: "지연 심각", color: "var(--danger)" },
+];
+
+function avg(rows: LogisticsItem[], key: "leadTimeDays" | "baselineDays"): number {
+  const sum = rows.reduce((s, r) => s + r[key], 0);
+  return Math.round((sum / rows.length) * 10) / 10;
+}
 
 export default async function LogisticsPage() {
   const shipments = await fetchLogisticsStatus();
@@ -16,6 +29,18 @@ export default async function LogisticsPage() {
     region,
     rows: shipments.filter((s) => s.region === region),
   })).filter((g) => g.rows.length > 0);
+
+  const regionLeadTimeGroups = grouped.map((g) => ({
+    label: g.region,
+    a: avg(g.rows, "leadTimeDays"),
+    b: avg(g.rows, "baselineDays"),
+  }));
+
+  const statusDonutData = STATUS_ORDER.map(({ status, color }) => ({
+    label: status,
+    value: shipments.filter((s) => s.status === status).length,
+    color,
+  }));
 
   return (
     <>
@@ -28,9 +53,30 @@ export default async function LogisticsPage() {
         {shipments[0]?.updatedAt ?? "-"} · 리드타임은 모두 대한민국 문전 기준
       </p>
 
+      <div className="panel">
+        <div className="panel-header">구간별 리드타임 시각화</div>
+        <div className="chart-panel-body chart-row">
+          <div>
+            <div className="chart-subtitle">지역 평균 리드타임: 현재 vs 평시(일)</div>
+            <GroupedBarChart
+              groups={regionLeadTimeGroups}
+              aLabel="현재"
+              bLabel="평시"
+              aColorFor={(label) => REGION_COLOR[label as LogisticsRegion] ?? "var(--accent)"}
+              unit="일"
+            />
+          </div>
+          <div>
+            <div className="chart-subtitle">전체 구간 상태 구성</div>
+            <DonutChart data={statusDonutData} centerLabel="전체 구간" centerValue={`${shipments.length}건`} />
+          </div>
+        </div>
+      </div>
+
       {grouped.map((g) => (
         <div className="panel" key={g.region}>
           <div className="panel-header">
+            <span className="region-dot" style={{ background: REGION_COLOR[g.region] }} />
             {g.region === "대한민국" ? "대한민국 국내" : `${g.region} ↔ 대한민국`} 구간
           </div>
           <table>
